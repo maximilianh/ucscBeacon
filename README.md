@@ -16,9 +16,6 @@ The whole repo can be cloned into a apache cgi-bin directory and should run as-i
 It has no other dependencies, only needs a Python > 2.5, which
 is the default in all current linux distributions and OSX.
 
-To get usage info, run the CGI with no option, e.g.
-http://localhost/cgi-bin/hgBeacon
-
 Current Beacon API draft reference at
 https://docs.google.com/document/d/154GBOixuZxpoPykGKcPOyrYUcgEXVe2NvKx61P4Ybn4
 
@@ -48,6 +45,7 @@ create one by adding a section like this to your apache config
     </Directory>
 
 Restart Apache:
+
     apachectl -k restart
 
 You can replace /usr/lib/cgi-bin with any other directory you prefer.
@@ -58,14 +56,17 @@ Installation
     cd /usr/lib/cgi-bin # (or /var/www/cgi-bin)
     git clone https://github.com/maximilianh/ucscBeacon.git
 
-Test the help message:
+Usage help info (as shown at UCSC):
+
     wget 'localhost/cgi-bin/ucscBeacon/hgBeacon' -O -
 
 Test if the symlinks work:
+
     wget 'localhost/cgi-bin/ucscBeacon/info' -O -
     wget 'localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=1&allele=T' -O -
 
 If the symlinks do not work, you can still query your beacon like this:
+
     wget 'localhost/cgi-bin/ucscBeacon/hgBeacon?chromosome=1&position=1&allele=T' -O -
 
 You can rename the "ucscBeacon" directory to any different name, like "beacon"
@@ -77,10 +78,12 @@ Adding your own data
 Format your alleles as (chrom,start,end,allele) like in the file test.bed.
 Put the text file into the directory data.
 Then index it:
+
     cd data
     ../utils/bedToBigBed myData.bed chrom.sizes myData.bb
 
 You should now be able to query your new dataset with URLs like this:
+
     wget "http://localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=1234&allele=T&dataset=myData" -O -
 
 You might also want to adapt the beaconDesc and DEFAULTDATASET variables 
