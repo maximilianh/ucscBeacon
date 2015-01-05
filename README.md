@@ -56,6 +56,9 @@ Installation
     cd /usr/lib/cgi-bin # (or /var/www/cgi-bin)
     git clone https://github.com/maximilianh/ucscBeacon.git
 
+Test it
+=======
+
 Usage help info (as shown at UCSC):
 
     wget 'localhost/cgi-bin/ucscBeacon/hgBeacon' -O -
