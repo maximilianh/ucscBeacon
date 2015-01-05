@@ -4,10 +4,10 @@ Introduction
 This is a simple implementation of the GA4GH beacon 0.2 draft API.
 
 The GA4H beacon system http://ga4gh.org/#/beacon is a small webservice
-that accepts a chromosome position and allele and replies with "yes", "no" or
-"maybe" if it finds information about the allele.  The purpose of the system is
-not maximum data transfer, but limiting information, to prevent the
-identification of patients or at least make it very hard to identify them.
+that accepts a chromosome position and allele and replies with "yes", "no" if
+it finds information about the allele.  The purpose of the system is not
+maximum data transfer, but limiting information, to prevent the identification
+of patients or at least make it very hard to identify them.
 
 This implementation consists of a python script (hgBeacon), two symlinks to it,
 a data directory with data files in "bigBed" format and a directory with binary 
