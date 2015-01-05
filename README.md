@@ -40,33 +40,33 @@ create one by adding a section like this to your apache config
 (/etc/apache2/sites-enabled/000-default.conf in Debian-Ubuntu or
 /etc/httpd/httpd.conf in Redhat-like distros):
 
-  ScriptAlias /cgi-bin/ /usr/lib/cgi-bin/
-  <Directory "/usr/lib/cgi-bin">
-  Options +ExecCGI -MultiViews +SymLinksIfOwnerMatch
-  Order allow,deny
-  Allow from all
-  </Directory>
+    ScriptAlias /cgi-bin/ /usr/lib/cgi-bin/
+    <Directory "/usr/lib/cgi-bin">
+    Options +ExecCGI -MultiViews +SymLinksIfOwnerMatch
+    Order allow,deny
+    Allow from all
+    </Directory>
 
 Restart Apache:
-  apachectl -k restart
+    apachectl -k restart
 
 You can replace /usr/lib/cgi-bin with any other directory you prefer.
 
 Installation
 ============
 
-  cd /usr/lib/cgi-bin # (or /var/www/cgi-bin)
-  git clone https://github.com/maximilianh/ucscBeacon.git
+    cd /usr/lib/cgi-bin # (or /var/www/cgi-bin)
+    git clone https://github.com/maximilianh/ucscBeacon.git
 
 Test the help message:
-wget 'localhost/cgi-bin/ucscBeacon/hgBeacon' -O -
+    wget 'localhost/cgi-bin/ucscBeacon/hgBeacon' -O -
 
 Test if the symlinks work:
-wget 'localhost/cgi-bin/ucscBeacon/info' -O -
-wget 'localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=1&allele=T' -O -
+    wget 'localhost/cgi-bin/ucscBeacon/info' -O -
+    wget 'localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=1&allele=T' -O -
 
 If the symlinks do not work, you can still query your beacon like this:
-wget 'localhost/cgi-bin/ucscBeacon/hgBeacon?chromosome=1&position=1&allele=T' -O -
+    wget 'localhost/cgi-bin/ucscBeacon/hgBeacon?chromosome=1&position=1&allele=T' -O -
 
 You can rename the "ucscBeacon" directory to any different name, like "beacon"
 or "myBeacon".
@@ -77,11 +77,11 @@ Adding your own data
 Format your alleles as (chrom,start,end,allele) like in the file test.bed.
 Put the text file into the directory data.
 Then index it:
-  cd data
-  ../utils/bedToBigBed myData.bed chrom.sizes myData.bb
+    cd data
+    ../utils/bedToBigBed myData.bed chrom.sizes myData.bb
 
 You should now be able to query your new dataset with URLs like this:
-  wget "http://localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=1234&allele=T&dataset=myData" -O -
+    wget "http://localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=1234&allele=T&dataset=myData" -O -
 
 You might also want to adapt the beaconDesc and DEFAULTDATASET variables 
 in the hgBeacon script, so you do not need to supply the "dataset" parameter.
