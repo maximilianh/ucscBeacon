@@ -3,10 +3,10 @@ Introduction
 
 This is a simple implementation of the GA4GH beacon 0.2 draft API.
 
-The GA4H beacon system http://ga4gh.org/#/beacon is a smal webservice
-that accepts a chromosome position and replies with "yes", "no" or "maybe"
-if it finds information about a allele.  The purpose of the system is not
-maximum data transfer, but limiting information, so as to prevent the
+The GA4H beacon system http://ga4gh.org/#/beacon is a small webservice
+that accepts a chromosome position and allele and replies with "yes", "no" or
+"maybe" if it finds information about the allele.  The purpose of the system is
+not maximum data transfer, but limiting information, to prevent the
 identification of patients or at least make it very hard to identify them.
 
 This implementation consists of a python script (hgBeacon), two symlinks to it,
@@ -19,7 +19,7 @@ is the default in all current linux distributions and OSX.
 To get usage info, run the CGI with no option, e.g.
 http://localhost/cgi-bin/hgBeacon
 
-API reference at
+Current Beacon API draft reference at
 https://docs.google.com/document/d/154GBOixuZxpoPykGKcPOyrYUcgEXVe2NvKx61P4Ybn4
 
 Apache setup
