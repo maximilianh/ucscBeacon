@@ -326,6 +326,10 @@ def main():
     allele = form.getfirst("allele")
     reference = form.getfirst("reference")
 
+    if chrom==None and pos==None and allele==None:
+        printHelp()
+        sys.exit(0)
+
     ret = lookupAllele(chrom, pos, allele, reference, track)
 
     if form.getfirst("format")=="text":
