@@ -1,0 +1,54 @@
+#!/usr/bin/env python
+import sys, json, urllib2
+import unittest
+import imp
+
+imp.load_source("hgBeacon", "hgBeacon") # hgBeacon does not have the .py extension
+import hgBeacon
+
+baseUrl = None
+if len(sys.argv)!=1:
+    baseUrl = sys.argv[1]
+
+#def getJson(query):
+    #" query example: query?dataset=lovd&chromosome=1&position=2160494&allele=T"
+    #url = baseUrl+"/"+query
+    #ret = json.loads(urllib2.urlopen(url).read())
+    #return ret
+
+class TestBeacon(unittest.TestCase):
+
+    def test_outside(self):
+        " test query, beacon and null reply "
+        maxInt = 2147483647
+        rep = hgBeacon.lookupAllele("1", str(maxInt), "T", "", "test")
+        self.assertTrue(rep["query"]["position"]==maxInt)
+        self.assertTrue(rep["query"]["reference"]=="GRCh37")
+        self.assertTrue(rep["query"]["allele"]=="T")
+        self.assertTrue(rep["query"]["chromosome"]=="1")
+        self.assertTrue(rep["response"]["exists"]=="null")
+
+        bi = rep["beacon"]
+        self.assertTrue(bi["id"] != "")
+        self.assertTrue(bi["name"] != "")
+        self.assertTrue(bi["organization"] != "")
+        self.assertTrue(bi["description"] != "")
+        self.assertTrue(bi["api"] != "")
+
+    def test_allele(self):
+        " test true reply "
+        pos = 883516
+        rep = hgBeacon.lookupAllele("1", str(pos), "T", "", "test")
+        self.assertTrue(rep["response"]["exists"]=="true")
+
+    def test_allele_false(self):
+        " test false reply "
+        pos = 883516
+        rep = hgBeacon.lookupAllele("1", str(pos), "A", "", "test")
+        self.assertTrue(rep["response"]["exists"]=="false")
+
+#if __name__ == '__main__':
+    #unittest.main()
+suite = unittest.TestLoader().loadTestsFromTestCase(TestBeacon)
+unittest.TextTestRunner(verbosity=2).run(suite)
+

@@ -1,0 +1,340 @@
+#!/usr/bin/env python
+# A beacon for tracks we can't distribute: LOVD and HGMD
+# see ga4gh.org/#/beacon and redmine 14393
+# Please do read the GA4GH website on the background of this CGI, otherwise
+# the functionality provided does not make any sense, without the context
+
+import cgi, subprocess, sys, cgitb, os, socket, time, json, glob, urlparse
+from os.path import join, isfile, dirname, isdir, basename
+
+# dir for bigBed files
+# DATADIR = "/gbdb/hg19/beacon" # for UCSC
+DATADIR = "data" # for GA4GH
+
+# dir of the CGIs relative to REQUEST_URI
+#cgiDir = ".." # symlinks are one level below the main cgi-bin dir
+cgiDir = "." # symlinks are in the current dir, for GA4GH
+
+# cache of hg.conf dict
+hgConf = None
+
+# descriptions of some datasets we know of
+DataSetDescs = {
+"hgmd" : "Human Genome Variation Database, public version, provided by Biobase",
+"lovd" : "Leiden Open Varation Database installations that agreed to share their variants",
+"test" : "small test data on Chromosome 1, copied from ClinVar"
+}
+
+# default dataset if none specified in request
+#DEFAULTDATASET = "lovd"
+DEFAULTDATASET = "test" # GA4GH
+
+# general info about this beacon
+hostName = os.environ.get("HTTP_HOST", "localhost")
+homepage = "http://%s/cgi-bin/hgBeacon" % hostName
+beaconDesc = {
+    "id":"ucsc-browser", \
+    "name":"Genome Browser", \
+    "organization" : "UCSC", \
+    "description" : "UCSC Genome Browser",
+    "api" : "0.2",
+    "homepage": homepage
+    }
+# the list genome reference we support
+beaconReferences = ["GRCh37"]
+
+helpText = """
+<pre>
+A Genomics Alliance Beacon at UCSC, see http://ga4gh.org/#/beacon
+
+In collaboration with the Leiden Open Variation Database and Biobase/HGMD.
+
+endpoint cgi-bin/beacon/query:
+
+parameters:
+- reference: if specified, has to be GRCh37
+- chromosome: 1 - 22, X, Y or M
+- dataset: either lovd or hgmd. Defaults to "lovd".
+- position: 1-based position on chromosome
+- allele: A,C,T,G or I or D. Ignored for HGMD (HGMD gives out only
+  positions, not the alleles, these are only on their website)
+- format: if "text",  does not return JSON, but just one of the words "true",
+      "false" or "overlap".  Easier to parse for simple shell scripts.
+
+cgi-bin/beacon/info:
+- shows info about beacon, e.g. number of variants served.
+
+For HGMD, we do not have the alleles, so "overlap" is always returned.
+For LOVD, an overlap with a short deletion or duplication returns "overlap". 
+
+To get more details about a variant:
+- dataset LOVD: Use the LOVD API to get all info, see chapter 9 of the 
+  LOVD manual, http://www.lovd.nl/3.0/docs/LOVD_manual_3.0.pdf
+  Or search manually on http://www.lovd.nl/3.0/home
+- dataset hgmd: Create an account on http://www.hgmd.cf.ac.uk/ and search
+  manually for the variant.
+
+Examples:
+%(host)s/cgi-bin/beacon2/query?dataset=lovd&chromosome=1&position=808922&allele=A
+- returns "true"
+
+%(host)s/cgi-bin/beacon2/query?dataset=lovd&chromosome=1&position=2160494&allele=T
+- returns "overlap", because the allele is in a small deletion
+
+%(host)s/cgi-bin/beacon2/query?dataset=hgmd&chromosome=1&position=985955&allele=T
+- returns "overlap", as HGMD does not share the alleles
+
+%(host)s/cgi-bin/beacon2/query?dataset=hgmd&chromosome=1&position=2160494&allele=T
+- returns "null", no information at this position
+
+IP-based throttling:
+For each incoming request from an IP address, 75 msecs are added after every
+request, and every 15 secs 75 seconds are removed. No delay is imposed when
+fewer than 10 seconds have accumulated. This means that about 150 queries
+can be sent before a delay of about 10 seconds is imposed for an IP
+address. If a delay of 20 seconds has accumulated (=the client is using
+multi-threaded requests) the client IP is blocked from further requests
+until the delay falls under 20 seconds.
+</pre>
+"""
+
+def queryBottleneck(host, port, ip):
+    " contact UCSC-style bottleneck server to get current delay time "
+    # send ip address
+    s =  socket.socket()
+    s.connect((host, int(port)))
+    msg = ip
+    d = chr(len(msg))+msg
+    s.send(d)
+
+    # read delay time
+    expLen = ord(s.recv(1))
+    totalLen = 0
+    buf = list()
+    while True:
+        resp = s.recv(1024)
+        buf.append(resp)
+        totalLen+= len(resp)
+        if totalLen==expLen:
+            break
+    return int("".join(buf))
+
+def parseConf(fname):
+    " parse a hg.conf style file, return as dict key -> value (both are strings) "
+    conf = {}
+    for line in open(fname):
+        line = line.strip()
+        if line.startswith("#"):
+            continue
+        elif line.startswith("include "):
+            inclFname = line.split()[1]
+            inclPath = join(dirname(fname), inclFname)
+            if isfile(inclPath):
+                inclDict = parseConf(inclPath)
+                conf.update(inclDict)
+        elif "=" in line: # string search for "="
+            key, value = line.split("=")
+            conf[key] = value
+    return conf
+
+def parseHgConf(confDir="."):
+    """ return hg.conf as dict key:value """
+    global hgConf
+    if hgConf is not None:
+        return hgConf
+
+    hgConf = dict() # python dict = hash table
+
+    currDir = dirname(__file__)
+    fname = join(currDir, confDir, "hg.conf")
+    if not isfile(fname):
+        fname = join(currDir, "hg.conf")
+    if not isfile(fname):
+        return {}
+    hgConf = parseConf(fname)
+
+    return hgConf
+
+def errAbort(errMsg=None):
+    " exit with error message "
+    if errMsg == None:
+        sys.exit(0)
+
+    helpUrl = "http://%s/cgi-bin/hgBeacon?page=help" % hostName
+
+    ret = {"errormsg":errMsg, 
+        "more_info":"for a complete description of the parameters, read the help message at %s" % helpUrl}
+    printJson(ret)
+    sys.exit(0)
+
+def printHelp():
+    " print help text to stdout and exit "
+    print "<html><body>"
+    host = hostName # convert from global to local var
+    print helpText % locals()
+    print "</body></html>"
+    sys.exit(0)
+
+def dataSetResources():
+    " Returns the list of DataSetResources "
+    totalSize = 0
+    dsrList = []
+    for fname in glob.glob(join(DATADIR, "*.bb")):
+        args = ["%s/utils/bigBedInfo" % cgiDir, fname]
+        p = subprocess.Popen(args, stdout=subprocess.PIPE)
+        for l in p.stdout:
+            if l.startswith("itemCount"):
+                itemCount = int(l.strip().split()[1].replace(",",""))
+        # the dataset ID is just the file basename without extension
+        dsId = basename(fname).split(".")[0]
+        dsr = (dsId, DataSetDescs.get(dsId, ""), itemCount)
+        dsrList.append(dsr)
+        totalSize += itemCount
+    return totalSize, dsrList
+
+def beaconInfo():
+    " return a beaconInfo dict "
+    size, dsrList = dataSetResources()
+    return \
+        {
+        "beacon": beaconDesc,
+        "references": beaconReferences,
+        "datasets": dsrList,
+        "size": size
+        }
+
+def printJson(data):
+    print json.dumps(data, indent=4, sort_keys=True,separators=(',', ': '))
+
+def hgBotDelay():
+    " implement bottleneck delay, get bottleneck server from hg.conf "
+    global hgConf
+    hgConf = parseHgConf("..")
+    if "bottleneck.host" not in hgConf:
+        return
+    ip = os.environ["REMOTE_ADDR"]
+    delay = queryBottleneck(hgConf["bottleneck.host"], hgConf["bottleneck.port"], ip)
+    if delay>10000:
+        time.sleep(delay/1000.0)
+    if delay>20000:
+        print("Blocked")
+        sys.exit(0)
+
+def lookupAllele(chrom, pos, allele, reference, track):
+    " lookup allele and return dict in beacon API format "
+    # check parameters
+    if reference==None or reference=="":
+        reference="GRCh37"
+    if reference!="GRCh37":
+        errAbort("only GRCh37 is supported")
+    if chrom==None or chrom=="":
+        errAbort()
+    if pos==None or not pos.isdigit():
+        errAbort("position parameter is not a number")
+    if pos=="0":
+        errAbort("position is defined to be a 1-based number, cannot be 0")
+    if allele==None:
+        errAbort("missing allele parameter")
+    if len(allele)!=1 or allele[0].lower() not in "actgdi":
+        errAbort("invalid allele, can only be a single letter and one of ACTGDI")
+    if track is None or track=="":
+        track = DEFAULTDATASET
+    if not track.isalpha():
+        errAbort("dataset/track parameter must contain only alphanumeric characters")
+
+    # convert chrom to hg19 format
+    if chrom==None:
+        errAbort( "missing chromosome parameter")
+    if not ((chrom.isdigit() and int(chrom)>=1 and int(chrom)<=22) or chrom in ["X","Y","M"]):
+        errAbort( "invalid chromosome name %s" % chrom)
+    if not chrom.startswith("chr"):
+        chrom = "chr"+chrom
+        
+    # upcase allele, make pos 0-based
+    allele = allele.upper()
+    pos = int(pos)-1
+
+    # resolve dataset to filename
+    trackFname = join(DATADIR, track+".bb")
+    if not isfile(trackFname):
+        errAbort("illegal dataset/track name %s" % track)
+
+    # run tool
+    args = ["%s/utils/bigBedToBed" % cgiDir, trackFname, "stdout", "-chrom=%s"%chrom, "-start=%d"%pos, "-end=%d"%(pos+1)]
+    try:
+        p = subprocess.Popen(args, stdout=subprocess.PIPE)
+    except OSError:
+        errAbort("Cannot run the command %s. Make sure you can run these binaries from a command line and they are executable by apache" % repr(args))
+
+    # parse output
+    exists = "null"
+    for line in p.stdout:
+        exists = "overlap"
+        fs = line.rstrip("\n").split("\t")
+        if len(fs)==3:
+            # if no name field, can only return overlap
+            exists = "overlap"
+        else:
+            obsAllele = fs[3][-1] # last letter of name field
+            if obsAllele==allele:
+                exists="true"
+            else:
+                exists="false"
+
+    query = {
+        "allele": allele,
+        "chromosome": chrom.replace("chr",""),
+        "position": pos+1,
+        "reference": reference,
+        "dataset": track
+        }
+
+    response = {"exists" : exists}
+
+    ret = {"beacon" : beaconDesc, "query" : query, "response" : response}
+    return ret
+
+
+def main():
+    print "Content-Type: text/html\n"
+
+    if not isdir(DATADIR):
+        errAbort("hgBeacon is intended to be run at UCSC. <br> On this "
+            "machine the directory %s does not exist so the program will not run.<p>" \
+            % DATADIR)
+
+    url = os.environ["REQUEST_URI"] 
+    parsedUrl = urlparse.urlparse(url) 
+
+    # get CGI parameters
+    form = cgi.FieldStorage()
+
+    # react based on symlink that was used to call this script
+    page = parsedUrl[2].split("/")[-1] # last part of path is REST endpoint
+    if page=="info":
+        printJson(beaconInfo())
+        sys.exit(0)
+
+    hgBotDelay()
+
+    track = form.getfirst("dataset")
+    if track is None:
+        track = form.getfirst("track")
+
+    chrom = form.getfirst("chromosome")
+    pos = form.getfirst("position")
+    allele = form.getfirst("allele")
+    reference = form.getfirst("reference")
+
+    ret = lookupAllele(chrom, pos, allele, reference, track)
+
+    if form.getfirst("format")=="text":
+        print ret["response"]["exists"]
+    else:
+        printJson(ret)
+
+if __name__=="__main__":
+    # deactivate this on the RR, but useful for debugging: prints a http header
+    # on errors 
+    cgitb.enable()
+    main()
