@@ -106,22 +106,22 @@ IP throttling
 =============
 
 The beacon can optionally slow down requests, if too many come in from the same
-IP address. You have to run a bottleneck server for this, the tool is called
-"bottleneck" and can be downloaded as a binary from
-http://hgdownload.cse.ucsc.edu/admin/exe/ or in source from
-http://genome.ucsc.edu/admin/git.html. Run it as "bottleneck start", the program
-will stay as a daemon in the background.
+IP address. This is meant to prevent whole-genome queries for all alleles. You
+have to run a bottleneck server for this, the tool is called "bottleneck" and
+can be downloaded as a binary from http://hgdownload.cse.ucsc.edu/admin/exe/ or
+in source from http://genome.ucsc.edu/admin/git.html. Run it as "bottleneck
+start", the program will stay as a daemon in the background.
 
-Then create a file hg.conf in the same directory as hgBeacon and add these lines:
+create a file hg.conf in the same directory as hgBeacon and add these lines:
     bottleneck.host=localhost
     bottleneck.port=17776
 
-Then for each request, hgBeacon will contact the bottleneck server. It  will
+for each request, hgBeacon will contact the bottleneck server. It will
 increase a counter by 150msec for each request from an IP. After every second
 without a request from an IP, 10msec will get deducted from the counter. As
 soon as the total counter exceeds 10 seconds for an IP, all beacon replies will
 get delayed by the current counter for this IP. If the counter still exceeds 20
 seconds (which can only happen if the client uses multiple threads), the beacon
-will block this IP address.
+will block this IP address until the counter falls below 20 seconds again.
 
 
