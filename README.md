@@ -26,11 +26,19 @@ Just copy the repo into your cgi-bin directory.
 Under a Redhat-like linux, this is /var/www/cgi-bin, on more Debian-like systems
 this is /usr/lib/cgi-bin.
 
+If your apache does not allow symlinks or you cannot or do not want to modify
+the apache config, just use hard links instead of symlinks:
+  
+  rm query info
+  ln hgBeacon query
+  ln hgBeacon info
+
 If you want to use the /info and /query symlinks, you will need to allow symlinks 
 in Apache. The Apache config file
 is /etc/httpd/conf/httpd.conf on Redhat and /etc/apache2/sites-enabled/000-default.conf
 on Debian/Ubuntu. The config line for this is "Options +SymLinksIfOwnerMatch", add
 it for the directory that contains cgi-bin or has the ExecCGI Option already set.
+See below for an example of what this should look like.
 
 If you do not have a cgi-bin directory in Apache at all, you can 
 create one by adding a section like this to your apache config
@@ -61,16 +69,16 @@ Test it
 
 Usage help info (as shown at UCSC):
 
-    wget 'localhost/cgi-bin/ucscBeacon/hgBeacon' -O -
+    wget 'http://localhost/cgi-bin/ucscBeacon/hgBeacon' -O -
 
 Test if the symlinks work:
 
-    wget 'localhost/cgi-bin/ucscBeacon/info' -O -
-    wget 'localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=1&allele=T' -O -
+    wget 'http://localhost/cgi-bin/ucscBeacon/info' -O -
+    wget 'http://localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=1&allele=T' -O -
 
 If the symlinks do not work, you can still query your beacon like this:
 
-    wget 'localhost/cgi-bin/ucscBeacon/hgBeacon?chromosome=1&position=1&allele=T' -O -
+    wget 'http://localhost/cgi-bin/ucscBeacon/hgBeacon?chromosome=1&position=1&allele=T' -O -
 
 You can rename the "ucscBeacon" directory to any different name, like "beacon"
 or "myBeacon".
@@ -90,7 +98,7 @@ You should now be able to query your new dataset with URLs like this:
     wget "http://localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=1234&allele=T&dataset=myData" -O -
 
 You might also want to adapt the beaconDesc and DEFAULTDATASET variables 
-in the hgBeacon script, so you do not need to supply the "dataset" parameter.
+in the hgBeacon script, to avoid the "dataset" parameter.
 
 utils/ directory
 ================
@@ -112,11 +120,12 @@ can be downloaded as a binary from http://hgdownload.cse.ucsc.edu/admin/exe/ or
 in source from http://genome.ucsc.edu/admin/git.html. Run it as "bottleneck
 start", the program will stay as a daemon in the background.
 
-create a file hg.conf in the same directory as hgBeacon and add these lines:
+Create a file hg.conf in the same directory as hgBeacon and add these lines:
+
     bottleneck.host=localhost
     bottleneck.port=17776
 
-for each request, hgBeacon will contact the bottleneck server. It will
+For each request, hgBeacon will contact the bottleneck server. It will
 increase a counter by 150msec for each request from an IP. After every second
 without a request from an IP, 10msec will get deducted from the counter. As
 soon as the total counter exceeds 10 seconds for an IP, all beacon replies will
