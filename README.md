@@ -19,12 +19,18 @@ is the default in all current linux distributions and OSX.
 Current Beacon API draft reference at
 https://docs.google.com/document/d/154GBOixuZxpoPykGKcPOyrYUcgEXVe2NvKx61P4Ybn4
 
-Apache setup
+Installation
 ============
 
 Just copy the repo into your cgi-bin directory.
 Under a Redhat-like linux, this is /var/www/cgi-bin, on more Debian-like systems
 this is /usr/lib/cgi-bin.
+
+    cd /usr/lib/cgi-bin # (or /var/www/cgi-bin)
+    git clone https://github.com/maximilianh/ucscBeacon.git
+
+Apache setup
+============
 
 If your apache does not allow symlinks or you cannot or do not want to modify
 the apache config, just use hard links instead of symlinks:
@@ -57,12 +63,6 @@ Restart Apache:
     apachectl -k restart
 
 You can replace /usr/lib/cgi-bin with any other directory you prefer.
-
-Installation
-============
-
-    cd /usr/lib/cgi-bin # (or /var/www/cgi-bin)
-    git clone https://github.com/maximilianh/ucscBeacon.git
 
 Test it
 =======
