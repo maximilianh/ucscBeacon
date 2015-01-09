@@ -29,9 +29,9 @@ this is /usr/lib/cgi-bin.
 If your apache does not allow symlinks or you cannot or do not want to modify
 the apache config, just use hard links instead of symlinks:
   
-  rm query info
-  ln hgBeacon query
-  ln hgBeacon info
+    rm query info
+    ln hgBeacon query
+    ln hgBeacon info
 
 If you want to use the /info and /query symlinks, you will need to allow symlinks 
 in Apache. The Apache config file
