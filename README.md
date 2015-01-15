@@ -10,13 +10,13 @@ maximum data transfer, but limiting information, to prevent the identification
 of patients or at least make it very hard to identify them.
 
 This implementation consists of a python script (hgBeacon), two symlinks to it,
-a data directory with data files in "bigBed" format and a directory with binary 
+a data directory with one data file in "bigBed" format and a directory with binary 
 utilities to quickly look up data in the bigBed files. No database is required.
 The whole repo can be cloned into a apache cgi-bin directory and should run as-is.
 It has no other dependencies, only needs a Python > 2.5, which
 is the default in all current linux distributions and OSX.
 
-Current Beacon API draft reference at
+Current Beacon API draft reference is at
 https://docs.google.com/document/d/154GBOixuZxpoPykGKcPOyrYUcgEXVe2NvKx61P4Ybn4
 
 Installation
@@ -79,6 +79,10 @@ Test if the symlinks work:
 If the symlinks do not work, you can still query your beacon like this:
 
     wget 'http://localhost/cgi-bin/ucscBeacon/hgBeacon?chromosome=1&position=1&allele=T' -O -
+
+For easier usage from wget or curl, this beacon supports a parameter 'format=text' which prints only one word (true, false, overlap or null):
+
+    wget 'http://localhost/cgi-bin/ucscBeacon/hgBeacon?chromosome=1&position=1&allele=T&format=text' -O - 
 
 You can rename the "ucscBeacon" directory to any different name, like "beacon"
 or "myBeacon".
