@@ -55,7 +55,7 @@ parameters:
 - reference: if specified, has to be GRCh37
 - chromosome: 1 - 22, X, Y or M
 - dataset: either lovd or hgmd. Defaults to "lovd".
-- position: 1-based position on chromosome
+- position: 0-based position on chromosome
 - allele: A,C,T,G or I or D. Ignored for HGMD (HGMD gives out only
   positions, not the alleles, these are only on their website)
 - format: if "text",  does not return JSON, but just one of the words "true",
@@ -75,16 +75,16 @@ To get more details about a variant:
   manually for the variant.
 
 Examples:
-%(host)s/cgi-bin/beacon2/query?dataset=lovd&chromosome=1&position=808922&allele=A
+%(host)s/cgi-bin/beacon2/query?dataset=lovd&chromosome=1&position=808921&allele=A
 - returns "true"
 
-%(host)s/cgi-bin/beacon2/query?dataset=lovd&chromosome=1&position=2160494&allele=T
+%(host)s/cgi-bin/beacon2/query?dataset=lovd&chromosome=1&position=2160493&allele=T
 - returns "overlap", because the allele is in a small deletion
 
-%(host)s/cgi-bin/beacon2/query?dataset=hgmd&chromosome=1&position=985955&allele=T
+%(host)s/cgi-bin/beacon2/query?dataset=hgmd&chromosome=1&position=985954&allele=T
 - returns "overlap", as HGMD does not share the alleles
 
-%(host)s/cgi-bin/beacon2/query?dataset=hgmd&chromosome=1&position=2160494&allele=T
+%(host)s/cgi-bin/beacon2/query?dataset=hgmd&chromosome=1&position=2160493&allele=T
 - returns "null", no information at this position
 
 IP-based throttling:
@@ -221,26 +221,26 @@ def hgBotDelay():
         sys.exit(0)
 
 def lookupAllele(chrom, pos, allele, reference, track):
-    " lookup allele and return dict in beacon API format "
+    " lookup allele and return dict in beacon API format. All parameters are strings or None. "
     # check parameters
     if reference==None or reference=="":
         reference="GRCh37"
-    if reference!="GRCh37":
-        errAbort("only GRCh37 is supported")
+    if reference not in beaconReferences:
+        errAbort("invalid 'reference' parameter, valid ones are %s" % ",".join(beaconReferences))
     if chrom==None or chrom=="":
         errAbort()
-    if pos==None or not pos.isdigit():
-        errAbort("position parameter is not a number")
-    if pos=="0":
-        errAbort("position is defined to be a 1-based number, cannot be 0")
     if allele==None:
         errAbort("missing allele parameter")
     if len(allele)!=1 or allele[0].lower() not in "actgdi":
-        errAbort("invalid allele, can only be a single letter and one of ACTGDI")
+        errAbort("invalid allele parameter, can only be a single letter and one of ACTGDI")
     if track is None or track=="":
         track = DEFAULTDATASET
     if not track.isalpha():
-        errAbort("dataset/track parameter must contain only alphanumeric characters")
+        errAbort("'dataset' parameter must contain only alphanumeric characters")
+
+    if pos==None or not pos.isdigit():
+        errAbort("'position' parameter is not a number")
+    pos = int(pos)
 
     # convert chrom to hg19 format
     if chrom==None:
@@ -250,9 +250,8 @@ def lookupAllele(chrom, pos, allele, reference, track):
     if not chrom.startswith("chr"):
         chrom = "chr"+chrom
         
-    # upcase allele, make pos 0-based
+    # upcase allele
     allele = allele.upper()
-    pos = int(pos)-1
 
     # resolve dataset to filename
     trackFname = join(DATADIR, track+".bb")
@@ -284,7 +283,7 @@ def lookupAllele(chrom, pos, allele, reference, track):
     query = {
         "allele": allele,
         "chromosome": chrom.replace("chr",""),
-        "position": pos+1,
+        "position": pos,
         "reference": reference,
         "dataset": track
         }

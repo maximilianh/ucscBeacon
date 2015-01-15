@@ -20,7 +20,7 @@ class TestBeacon(unittest.TestCase):
 
     def test_outside(self):
         " test query, beacon and null reply "
-        maxInt = 2147483647
+        maxInt = 2147483646
         rep = hgBeacon.lookupAllele("1", str(maxInt), "T", "", "test")
         self.assertTrue(rep["query"]["position"]==maxInt)
         self.assertTrue(rep["query"]["reference"]=="GRCh37")
@@ -37,13 +37,13 @@ class TestBeacon(unittest.TestCase):
 
     def test_allele(self):
         " test true reply "
-        pos = 883516
+        pos = 883515
         rep = hgBeacon.lookupAllele("1", str(pos), "T", "", "test")
         self.assertTrue(rep["response"]["exists"]=="true")
 
     def test_allele_false(self):
         " test false reply "
-        pos = 883516
+        pos = 883515
         rep = hgBeacon.lookupAllele("1", str(pos), "A", "", "test")
         self.assertTrue(rep["response"]["exists"]=="false")
 
