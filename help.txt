@@ -1,0 +1,28 @@
+<pre>
+A Genomics Alliance Beacon, see http://ga4gh.org/#/beacon
+
+REST endpoint cgi-bin/beacon/query:
+
+parameters:
+- reference: if specified, has to be GRCh37
+- chromosome: 1 - 22, X, Y or M
+- dataset: either lovd or hgmd. Defaults to "lovd".
+- position: 0-based position on chromosome
+- allele: A,C,T,G or I or D. Ignored for HGMD (HGMD gives out only
+  positions, not the alleles, these are only on their website)
+- format: if "text",  does not return JSON, but just one of the words "true",
+      "false", "overlap" or "null".  Easier to parse for shell scripts.
+
+cgi-bin/beacon/info:
+- shows info about beacon, e.g. number of variants served.
+
+Examples:
+%(host)s/cgi-bin/beacon/query?dataset=test&chromosome=1&position=883515&allele=T
+- returns "true", this allele is in the beacon
+
+%(host)s/cgi-bin/beacon/query?dataset=test&chromosome=1&position=883515&allele=A
+- returns "false", this allele is not in the beacon
+
+%(host)s/cgi-bin/beacon2/query?dataset=hgmd&chromosome=1&position=2160493&allele=T
+- returns "null", no information at this position
+</pre>

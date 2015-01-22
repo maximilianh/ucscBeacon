@@ -43,61 +43,6 @@ beaconDesc = {
 # the list genome reference we support
 beaconReferences = ["GRCh37"]
 
-helpText = """
-<pre>
-A Genomics Alliance Beacon at UCSC, see http://ga4gh.org/#/beacon
-
-In collaboration with the Leiden Open Variation Database and Biobase/HGMD.
-
-endpoint cgi-bin/beacon/query:
-
-parameters:
-- reference: if specified, has to be GRCh37
-- chromosome: 1 - 22, X, Y or M
-- dataset: either lovd or hgmd. Defaults to "lovd".
-- position: 0-based position on chromosome
-- allele: A,C,T,G or I or D. Ignored for HGMD (HGMD gives out only
-  positions, not the alleles, these are only on their website)
-- format: if "text",  does not return JSON, but just one of the words "true",
-      "false" or "overlap".  Easier to parse for simple shell scripts.
-
-cgi-bin/beacon/info:
-- shows info about beacon, e.g. number of variants served.
-
-For HGMD, we do not have the alleles, so "overlap" is always returned.
-For LOVD, an overlap with a short deletion or duplication returns "overlap". 
-
-To get more details about a variant:
-- dataset LOVD: Use the LOVD API to get all info, see chapter 9 of the 
-  LOVD manual, http://www.lovd.nl/3.0/docs/LOVD_manual_3.0.pdf
-  Or search manually on http://www.lovd.nl/3.0/home
-- dataset hgmd: Create an account on http://www.hgmd.cf.ac.uk/ and search
-  manually for the variant.
-
-Examples:
-%(host)s/cgi-bin/beacon2/query?dataset=lovd&chromosome=1&position=808921&allele=A
-- returns "true"
-
-%(host)s/cgi-bin/beacon2/query?dataset=lovd&chromosome=1&position=2160493&allele=T
-- returns "overlap", because the allele is in a small deletion
-
-%(host)s/cgi-bin/beacon2/query?dataset=hgmd&chromosome=1&position=985954&allele=T
-- returns "overlap", as HGMD does not share the alleles
-
-%(host)s/cgi-bin/beacon2/query?dataset=hgmd&chromosome=1&position=2160493&allele=T
-- returns "null", no information at this position
-
-IP-based throttling:
-For each incoming request from an IP address, 75 msecs are added after every
-request, and every 15 secs 75 seconds are removed. No delay is imposed when
-fewer than 10 seconds have accumulated. This means that about 150 queries
-can be sent before a delay of about 10 seconds is imposed for an IP
-address. If a delay of 20 seconds has accumulated (=the client is using
-multi-threaded requests) the client IP is blocked from further requests
-until the delay falls under 20 seconds.
-</pre>
-"""
-
 def queryBottleneck(host, port, ip):
     " contact UCSC-style bottleneck server to get current delay time "
     # send ip address
@@ -171,6 +116,11 @@ def printHelp():
     " print help text to stdout and exit "
     print "<html><body>"
     host = hostName # convert from global to local var
+    if ".ucsc.edu" in host:
+        fname = "helpUcsc.txt"
+    else:
+        fname = "help.txt"
+    helpText = open(fname).read()
     print helpText % locals()
     print "</body></html>"
     sys.exit(0)
