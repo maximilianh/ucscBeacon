@@ -29,6 +29,11 @@ this is /usr/lib/cgi-bin.
     cd /usr/lib/cgi-bin # (or /var/www/cgi-bin)
     git clone https://github.com/maximilianh/ucscBeacon.git
 
+OSX: If you are working on OSX 64Bit, you need to replace the linux binaries in
+the "utils" subdirectory with binaries for OSX. Please download bigBedInfo,
+bigBedToBed and bedToBigBed from
+http://hgdownload.cse.ucsc.edu/admin/exe/macOSX.x86_64/.
+
 Apache setup
 ============
 
