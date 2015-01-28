@@ -123,7 +123,6 @@ Adding data from a VCF file
 ===========================
 
         zcat sample.vcf.gz | grep -v ^# | gawk '{OFS="\t"; print "chr"$1,$2-1,$2-1+length($4),$5}' | sed -e 's/chrMT/chrM/g' | sort -k1,1 -k2,2n > sample.bed
-
         /usr/lib/cgi-bin/ucscBeacon/utils/bedToBigBed sample.bed sample.bb
         mv sample.bb /usr/lib/cgi-bin/ucscBeacon/data/
 
