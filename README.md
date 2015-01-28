@@ -52,15 +52,25 @@ it for the directory that contains cgi-bin or has the ExecCGI Option already set
 See below for an example of what this should look like.
 
 If you do not have a cgi-bin directory in Apache at all, you can 
-create one by adding a section like this to your apache config
-(/etc/apache2/sites-enabled/000-default.conf in Debian-Ubuntu or
-/etc/httpd/httpd.conf in Redhat-like distros):
+create one by adding a section like the following to your apache config.
+The config is located in /etc/apache2/sites-enabled/000-default.conf in Debian-Ubuntu or
+/etc/httpd/httpd.conf in Redhat-like distros.
+
+This what it should look like in distros still using Apache2.2, like CentOs and Redhat:
 
     ScriptAlias /cgi-bin/ /usr/lib/cgi-bin/
     <Directory "/usr/lib/cgi-bin">
     Options +ExecCGI -MultiViews +SymLinksIfOwnerMatch
     Order allow,deny
     Allow from all
+    </Directory>
+
+This is the same for Apache2.4, for more modern distros like Ubuntu, Debian, ArchLinux, etc:
+
+    ScriptAlias /cgi-bin/ /usr/lib/cgi-bin/
+    <Directory "/usr/lib/cgi-bin">
+    Options +ExecCGI -MultiViews +SymLinksIfOwnerMatch
+    Require all granted
     </Directory>
 
 Restart Apache:
@@ -109,8 +119,16 @@ You should now be able to query your new dataset with URLs like this:
 You might also want to adapt the beaconDesc and DEFAULTDATASET variables 
 in the hgBeacon script, to avoid the "dataset" parameter.
 
-utils/ directory
-================
+Adding data from a VCF file
+===========================
+
+        zcat sample.vcf.gz | grep -v ^# | gawk '{OFS="\t"; print "chr"$1,$2-1,$2-1+length($4),$5}' | sed -e 's/chrMT/chrM/g' | sort -k1,1 -k2,2n > sample.vcf.bed
+
+        /usr/lib/cgi-bin/ucscBeacon/utils/bedToBigBed sample.bed sample.bb
+        mv sample.bb /usr/lib/cgi-bin/ucscBeacon/data/
+
+The utils/ directory
+====================
 
 The binary tools in this directory are static linux 64bit binaries distributed
 by UCSC.
