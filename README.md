@@ -142,8 +142,9 @@ IP throttling
 
 The beacon can optionally slow down requests, if too many come in from the same
 IP address. This is meant to prevent whole-genome queries for all alleles. You
-have to run a bottleneck server for this, the tool is called "bottleneck" and
-can be downloaded as a binary from http://hgdownload.cse.ucsc.edu/admin/exe/ or
+have to run a bottleneck server for this, the tool is called "bottleneck". 
+You can find a copy in the utils/ directory,
+download it as a binary from http://hgdownload.cse.ucsc.edu/admin/exe/ or
 in source from http://genome.ucsc.edu/admin/git.html. Run it as "bottleneck
 start", the program will stay as a daemon in the background.
 
