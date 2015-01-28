@@ -16,6 +16,10 @@ The whole repo can be cloned into a apache cgi-bin directory and should run as-i
 It has no other dependencies, only needs a Python > 2.5, which
 is the default in all current linux distributions and OSX.
 
+Please make sure that
+your system does not use python 3 by default (run "python --version"), but this is
+in 2015 only the case on ArchLinux, Gentoo, NetBsd, FreeBsd and a few other exotic ones.
+
 Current Beacon API draft reference is at
 https://docs.google.com/document/d/154GBOixuZxpoPykGKcPOyrYUcgEXVe2NvKx61P4Ybn4
 
