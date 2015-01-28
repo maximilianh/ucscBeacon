@@ -122,7 +122,7 @@ in the hgBeacon script, to avoid the "dataset" parameter.
 Adding data from a VCF file
 ===========================
 
-        zcat sample.vcf.gz | grep -v ^# | gawk '{OFS="\t"; print "chr"$1,$2-1,$2-1+length($4),$5}' | sed -e 's/chrMT/chrM/g' | sort -k1,1 -k2,2n > sample.vcf.bed
+        zcat sample.vcf.gz | grep -v ^# | gawk '{OFS="\t"; print "chr"$1,$2-1,$2-1+length($4),$5}' | sed -e 's/chrMT/chrM/g' | sort -k1,1 -k2,2n > sample.bed
 
         /usr/lib/cgi-bin/ucscBeacon/utils/bedToBigBed sample.bed sample.bb
         mv sample.bb /usr/lib/cgi-bin/ucscBeacon/data/
@@ -131,7 +131,7 @@ The utils/ directory
 ====================
 
 The binary tools in this directory are static linux 64bit binaries distributed
-by UCSC.
+by UCSC. The bigBed format is very similar to a tabix-indexed file.
 
 They can be downloaded for other platforms from
 http://hgdownload.cse.ucsc.edu/admin/exe/ or compiled from source, see
