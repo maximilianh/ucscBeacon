@@ -4,11 +4,11 @@ A Genomics Alliance Beacon, see http://ga4gh.org/#/beacon
 * REST endpoint cgi-bin/beacon/query:
 
   parameters:
-  - reference: if specified, has to be GRCh37
   - chromosome: 1 - 22, X, Y or M
   - allele: A,C,T,G or I<seq> or D<length>. 
   - position: 0-based position on chromosome
   - dataset: optional. If not specified all datasets will be queried.
+  - reference: optional. If specified, has to be GRCh37
   - format: if "text",  does not return JSON, but just one of the words "true",
         or "false".  Easier to parse for shell scripts.
 
@@ -17,12 +17,11 @@ A Genomics Alliance Beacon, see http://ga4gh.org/#/beacon
   no parameters
 
 Examples:
-%(host)s/cgi-bin/BEACONDIR/query?dataset=test&chromosome=1&position=883515&allele=T
+%(host)s/cgi-bin/BEACONDIR/query?dataset=test&chromosome=1&position=10150&allele=A
+%(host)s/cgi-bin/BEACONDIR/query?dataset=test&chromosome=1&position=4772339&allele=T
 - returns "true", this allele is in the beacon
 
-%(host)s/cgi-bin/BEACONDIR/query?dataset=test&chromosome=1&position=883515&allele=A
+%(host)s/cgi-bin/BEACONDIR/query?dataset=test&chromosome=1&position=1234&allele=T
 - returns "false", this allele is not in the beacon
 
-%(host)s/cgi-bin/BEACONDIR/query?dataset=test&chromosome=1&position=2160493&allele=T
-- returns "null", no information at this position
 </pre>
