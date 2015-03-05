@@ -10,18 +10,27 @@ baseUrl = None
 if len(sys.argv)!=1:
     baseUrl = sys.argv[1]
 
-#def getJson(query):
-    #" query example: query?dataset=lovd&chromosome=1&position=2160494&allele=T"
-    #url = baseUrl+"/"+query
-    #ret = json.loads(urllib2.urlopen(url).read())
-    #return ret
+def queryServer(chrom, pos, allele, reference, dataset):
+    " if baseUrl is set, query via http. Otherwise just call the script directly "
+    if baseUrl == None:
+        ret = hgBeacon.lookupAlleleJson(chrom, pos, allele, reference, dataset)
+    else:
+        url = baseUrl+"/query?chromosome=%s&position=%s&allele=%s" % (chrom, str(pos), allele)
+        if reference!="":
+            url=url+"&reference=%s" % reference
+        if dataset!="":
+            url=url+"&dataset=%s" % dataset
+
+        data = urllib2.urlopen(url).read()
+        ret = json.loads(data)
+    return ret
 
 class TestBeacon(unittest.TestCase):
 
     def test_outside(self):
-        " test query, beacon and null reply "
+        " test query, beacon "
         maxInt = 2147483646
-        rep = hgBeacon.lookupAlleleJson("1", str(maxInt), "T", "", "test")
+        rep = queryServer("1", str(maxInt), "T", "", "test")
         self.assertTrue(rep["query"]["position"]==maxInt)
         self.assertTrue(rep["query"]["reference"]=="GRCh37")
         self.assertTrue(rep["query"]["allele"]=="T")
@@ -36,15 +45,15 @@ class TestBeacon(unittest.TestCase):
         self.assertTrue(bi["api"] != "")
 
     def test_allele(self):
-        " test true reply with the ICGC sample"
-        pos = 10150
-        rep = hgBeacon.lookupAlleleJson("1", str(pos), "A", "", "test")
+        " test true reply with the special testing chromosome"
+        pos = 0
+        rep = queryServer("test", str(pos), "A", "", "")
         self.assertTrue(rep["response"]["exists"]=="true")
 
     def test_allele_false(self):
         " test false reply "
         pos = 10000
-        rep = hgBeacon.lookupAlleleJson("1", str(pos), "A", "", "test")
+        rep = queryServer("test", str(pos), "A", "", "test")
         self.assertTrue(rep["response"]["exists"]=="false")
 
 #if __name__ == '__main__':
