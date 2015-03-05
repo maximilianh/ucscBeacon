@@ -62,7 +62,7 @@ Test if the symlink works:
 
 See 'Apache setup' below if this shows an error.
 
-For easier usage from wget or curl, the script supports a parameter 'format=text' which prints only one word (true, false, overlap or null):
+For easier usage from wget or curl, the script supports a parameter 'format=text' which prints only one word (true or false):
 
     wget 'http://localhost/cgi-bin/hgBeacon?chromosome=10&position=9775129&allele=T&format=text' -O -
 

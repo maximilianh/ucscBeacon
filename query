@@ -33,11 +33,14 @@ hgConf = None
 
 # descriptions of datasets that this beacon is serving
 DataSetDescs = {
-"hgmd" : "Human Genome Variation Database, public version, provided by Biobase",
-"lovd" : "Leiden Open Varation Database installations that agreed to share their variants",
+"hgmd" : "Human Genome Variation Database, only single-nucleotide variants, public version, provided by Biobase",
+"lovd" : "Leiden Open Varation Database installations that agreed to share their variants, only single-nucleotide variants and deletions",
 "test" : "small test data on Chromosome 1, from ICGC",
 "test2" : "another piece of test data from Chromosome 1, also from ICGC"
 }
+
+# special case: same datasets do not have alt alleles. In this case, an overlap is enough to trigger a "true"
+NoAltDataSets = ["hgmd"]
 
 def queryBottleneck(host, port, ip):
     " contact UCSC-style bottleneck server to get current delay time "
@@ -211,9 +214,14 @@ def lookupAllele(chrom, pos, allele, reference, dataset):
         tableList = [dataset]
 
     for tableName in tableList:
-        sql = "SELECT * from %s WHERE chrom=? AND pos=? AND allele=?" % tableName
         cur = conn.cursor()
-        cur.execute(sql, (chrom, pos, allele))
+        if tableName in NoAltDataSets:
+            # some datasets don't have alt alleles, e.g. HGMD
+            sql = "SELECT * from %s WHERE chrom=? AND pos=?" % tableName
+            cur.execute(sql, (chrom, pos))
+        else:
+            sql = "SELECT * from %s WHERE chrom=? AND pos=? AND allele=?" % tableName
+            cur.execute(sql, (chrom, pos, allele))
         row = cur.fetchone()
         if row!=None:
             return "true"
@@ -246,11 +254,17 @@ def main():
 def parseArgs():
     " parse command line options into args and options "
     parser = optparse.OptionParser("""usage: %prog [options] filename [datasetName] - import VCF or BED files into the beacon database. 
-    The parameter 'datasetName' is optional and defaults to 'defaultDataset'.
-    """) 
+    - parameter 'datasetName' is optional and defaults to 'defaultDataset'.
+    - any existing dataset of the same name will be overwritten
+    - the data is written to beaconData.sqlite. You can use 'sqlite3' to inspect the data file.
+    - the input file can be gzipped
+    """)
 
     parser.add_option("-d", "--debug", dest="debug", \
         action="store_true", help="show debug messages") 
+    parser.add_option("-f", "--format", dest="format", \
+        action="store", help="format of input file, one of vcf, lovd, hgmd. default %default", \
+        default = "vcf") 
     (options, args) = parser.parse_args()
 
     if len(args)==0:
@@ -305,7 +319,7 @@ def dbQuery(conn, query, params):
         cursor.execute(query, params)
     return cursor.fetchall()
 
-def readAlleles(ifh):
+def readAllelesVcf(ifh):
     """ read alleles in VCF file 
         return a list of chrom, pos, allele tuples
     """
@@ -349,22 +363,72 @@ def readAlleles(ifh):
             print "Read %d rows..." % len(rows)
 
         dataRow = (chrom, pos, beaconAllele)
-        #dataStr = "%s|%d|%s" % (chrom, pos, beaconAllele)
         if dataRow in doneData:
             continue
 
         rows.append( dataRow )
         doneData.add( dataRow )
 
-        #if len(chunk)==50000:
-            #yield chunk
-            #chunk = []
-
-    #if len(chunk)!=0:
-        #yield chunk
     print "skipped %d VCF lines with empty ALT alleles" % emptyCount
     print "skipped %d VCF lines with both ALT and REF alleles len!=1, cannot encode as beacon queries" % skipCount
     return rows
+
+def readAllelesLovd(ifh):
+    """ read the LOVD bed file and return in format (chrom, pos, altAllele) 
+    This function is only used internally at UCSC.
+    """
+    alleles = []
+    count = 0
+    skipCount = 0
+    for line in ifh:
+        if line.startswith("chrom"):
+            continue
+        chrom, start, end, desc = line.rstrip("\n").split("\t")[:4]
+
+        if desc[-2]==">":
+            mutDesc = desc[-3:]
+            ref, _, alt = mutDesc
+            assert(len(mutDesc)==3)
+        elif desc.endswith("del"):
+            alt = "D"+str(int(end)-int(start))
+        else:
+            skipCount += 1
+            continue
+
+        chrom = chrom.replace("chr", "")
+        start = int(start)
+        alleles.append( (chrom, start, alt) )
+
+    print "read %d alleles, skipped %d non-SNV or del alleles" % (len(alleles), skipCount)
+    return list(set(alleles))
+
+def readAllelesHgmd(ifh):
+    """ read the HGMD bed file and return in format (chrom, pos, altAllele).
+    This function is only used internally at UCSC.
+    """
+    # chr1 2338004 2338005 PEX10:CM090797 0 2338004 2338005 PEX10 CM090797 substitution
+    alleles = []
+    count = 0
+    skipCount = 0
+    for line in ifh:
+        fields = line.rstrip("\n").split("\t")
+        chrom, start, end = fields[:3]
+        desc = fields[10]
+        start = int(start)
+        end = int(end)
+
+        if desc=="substitution":
+            assert(end-start==1)
+            alt = "*"
+        else:
+            skipCount += 1
+            continue
+
+        chrom = chrom.replace("chr", "")
+        alleles.append( (chrom, start, alt) )
+
+    print "read %d alleles, skipped %d non-SNV alleles" % (len(alleles), skipCount)
+    return list(set(alleles))
 
 def iterChunks(seq, size):
     " yields chunks of at most size elements from seq "
@@ -375,7 +439,7 @@ def printTime(time1, time2, rowCount):
     timeDiff = time2 - time1
     print "Time: %f secs for %d rows, %d rows/sec" % (timeDiff, rowCount, rowCount/timeDiff)
 
-def importFile(fileName, datasetName):
+def importFile(fileName, datasetName, format):
     """ open the sqlite db, create a table datasetName and write the data in fileName into it """
     conn = dbOpen()
     dbMakeTable(conn, datasetName)
@@ -395,10 +459,18 @@ def importFile(fileName, datasetName):
 
     # see http://stackoverflow.com/questions/1711631/improve-insert-per-second-performance-of-sqlite
     # for background why I do it like this
-    print "Reading %s" % (fileName)
+    print "Reading %s into database table %s" % (fileName, datasetName)
     rowCount = 0
     startTime = time.time()
-    alleles = list(readAlleles(ifh))
+
+    if format=="vcf":
+        alleles = readAllelesVcf(ifh)
+    elif format=="lovd":
+        alleles = readAllelesLovd(ifh)
+    elif format=="hgmd":
+        alleles = readAllelesHgmd(ifh)
+        
+
     loadTime = time.time()
 
     printTime(startTime, loadTime, len(alleles))
@@ -428,7 +500,7 @@ def mainCommandLine():
     else:
         datasetName = "defaultDataset"
 
-    importFile(fileName, datasetName)
+    importFile(fileName, datasetName, options.format)
     
 def mainCgi():
     print "Content-Type: text/html\n"
