@@ -6,12 +6,11 @@ A Genomics Alliance Beacon, see http://ga4gh.org/#/beacon
   parameters:
   - reference: if specified, has to be GRCh37
   - chromosome: 1 - 22, X, Y or M
-  - dataset: either lovd or hgmd. Defaults to "lovd".
+  - allele: A,C,T,G or I<seq> or D<length>. 
   - position: 0-based position on chromosome
-  - allele: A,C,T,G or I or D. Ignored for HGMD (HGMD gives out only
-    positions, not the alleles, these are only on their website)
+  - dataset: optional. If not specified all datasets will be queried.
   - format: if "text",  does not return JSON, but just one of the words "true",
-        "false", "overlap" or "null".  Easier to parse for shell scripts.
+        or "false".  Easier to parse for shell scripts.
 
 * REST endpoint cgi-bin/beacon/info:
   shows info about beacon, e.g. number of variants served.

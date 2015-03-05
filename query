@@ -1,1 +1,470 @@
-hgBeacon
+#!/usr/bin/env python
+# A beacon allows very limited queries against a set of variants without allowing someone
+# to download the list of variants
+# see ga4gh.org/#/beacon (UCSC redmine 14393)
+
+import cgi, subprocess, sys, cgitb, os, socket, time, json, glob, urlparse, time
+import sqlite3, gzip, optparse, gc, string, re
+from os.path import join, isfile, dirname, isdir, basename
+
+# general info about this beacon
+hostName = os.environ.get("HTTP_HOST", "localhost")
+homepage = "http://%s/cgi-bin/hgBeacon" % hostName
+beaconDesc = {
+    "id":"ucsc-browser", \
+    "name":"Genome Browser", \
+    "organization" : "UCSC", \
+    "description" : "UCSC Genome Browser",
+    "api" : "0.2",
+    "homepage": homepage
+    }
+# the list genome reference we support
+beaconReferences = ["GRCh37"]
+
+# sqlite database 
+SQLITEDB = "beaconData.sqlite"
+
+# dir of the CGIs relative to REQUEST_URI
+#cgiDir = ".." # symlinks are one level below the main cgi-bin dir
+cgiDir = "." # symlinks are in the current dir, for GA4GH
+
+# cache of hg.conf dict
+hgConf = None
+
+# descriptions of datasets that this beacon is serving
+DataSetDescs = {
+"hgmd" : "Human Genome Variation Database, public version, provided by Biobase",
+"lovd" : "Leiden Open Varation Database installations that agreed to share their variants",
+"test" : "small test data on Chromosome 1, from ICGC",
+"test2" : "another piece of test data from Chromosome 1, also from ICGC"
+}
+
+def queryBottleneck(host, port, ip):
+    " contact UCSC-style bottleneck server to get current delay time "
+    # send ip address
+    s =  socket.socket()
+    s.connect((host, int(port)))
+    msg = ip
+    d = chr(len(msg))+msg
+    s.send(d)
+
+    # read delay time
+    expLen = ord(s.recv(1))
+    totalLen = 0
+    buf = list()
+    while True:
+        resp = s.recv(1024)
+        buf.append(resp)
+        totalLen+= len(resp)
+        if totalLen==expLen:
+            break
+    return int("".join(buf))
+
+def parseConf(fname):
+    " parse a hg.conf style file, return as dict key -> value (both are strings) "
+    conf = {}
+    for line in open(fname):
+        line = line.strip()
+        if line.startswith("#"):
+            continue
+        elif line.startswith("include "):
+            inclFname = line.split()[1]
+            inclPath = join(dirname(fname), inclFname)
+            if isfile(inclPath):
+                inclDict = parseConf(inclPath)
+                conf.update(inclDict)
+        elif "=" in line: # string search for "="
+            key, value = line.split("=")
+            conf[key] = value
+    return conf
+
+def parseHgConf(confDir="."):
+    """ return hg.conf as dict key:value """
+    global hgConf
+    if hgConf is not None:
+        return hgConf
+
+    hgConf = dict() # python dict = hash table
+
+    currDir = dirname(__file__)
+    fname = join(currDir, confDir, "hg.conf")
+    if not isfile(fname):
+        fname = join(currDir, "hg.conf")
+    if not isfile(fname):
+        return {}
+    hgConf = parseConf(fname)
+
+    return hgConf
+
+def errAbort(errMsg=None):
+    " exit with error message "
+    if errMsg == None:
+        sys.exit(0)
+
+    helpUrl = "http://%s/cgi-bin/hgBeacon?page=help" % hostName
+
+    ret = {"errormsg":errMsg, 
+        "more_info":"for a complete description of the parameters, read the help message at %s" % helpUrl}
+    printJson(ret)
+    sys.exit(0)
+
+def printHelp():
+    " print help text to stdout and exit "
+    print "<html><body>"
+    host = hostName # convert from global to local var
+    if host.endswith(".ucsc.edu"):
+        fname = "helpUcsc.txt"
+    else:
+        fname = "help.txt"
+
+    currDir = dirname(__file__)
+    helpText = open(join(currDir, fname)).read()
+    print helpText % locals()
+    print "</body></html>"
+    sys.exit(0)
+
+def dataSetResources():
+    " Returns the list of DataSetResources "
+    totalSize = 0
+    dsrList = []
+    conn = dbOpen()
+    for tableName in dbListTables(conn):
+        rows = dbQuery(conn, "SELECT COUNT(*) from %s" % tableName, None)
+        itemCount = rows[0][0]
+        
+        # the dataset ID is just the file basename without extension
+        dsId = tableName
+        dsr = (dsId, DataSetDescs.get(dsId, ""), itemCount)
+        dsrList.append(dsr)
+        totalSize += itemCount
+    return totalSize, dsrList
+
+def beaconInfo():
+    " return a beaconInfo dict "
+    size, dsrList = dataSetResources()
+    return \
+        {
+        "beacon": beaconDesc,
+        "references": beaconReferences,
+        "datasets": dsrList,
+        "size": size
+        }
+
+def printJson(data):
+    print json.dumps(data, indent=4, sort_keys=True,separators=(',', ': '))
+
+def hgBotDelay():
+    " implement bottleneck delay, get bottleneck server from hg.conf "
+    global hgConf
+    hgConf = parseHgConf("..")
+    if "bottleneck.host" not in hgConf:
+        return
+    ip = os.environ["REMOTE_ADDR"]
+    delay = queryBottleneck(hgConf["bottleneck.host"], hgConf["bottleneck.port"], ip)
+    if delay>10000:
+        time.sleep(delay/1000.0)
+    if delay>20000:
+        print("Blocked")
+        sys.exit(0)
+
+def checkParams(chrom, pos, allele, reference, track):
+    " make sure the parameters follow the spec "
+    if reference==None or reference=="":
+        reference="GRCh37"
+    if reference not in beaconReferences:
+        errAbort("invalid 'reference' parameter, valid ones are %s" % ",".join(beaconReferences))
+    if chrom==None or chrom=="":
+        errAbort("missing chromosome parameter")
+    if allele==None or allele=="":
+        errAbort("missing allele parameter")
+
+    allele = allele.upper()
+    if not (re.compile("[ACTG]+").match(allele)!=None or \
+       re.compile("I[ACTG]+").match(allele)!=None or \
+       re.compile("D[0-9]+").match(allele)!=None):
+        errAbort("invalid allele parameter, can only be a [ACTG]+ or I[ACTG]+ or D[0-9]+")
+    if track is not None:
+        if not track.isalnum():
+            errAbort("'dataset' parameter must contain only alphanumeric characters")
+        if len(track)>100:
+            errAbort("'dataset' parameter must not be longer than 100 chars")
+
+    if pos==None or not pos.isdigit():
+        errAbort("'position' parameter is not a number")
+    pos = int(pos)
+
+    # convert chrom to hg19 format
+    if chrom==None:
+        errAbort( "missing chromosome parameter")
+    if not ((chrom.isdigit() and int(chrom)>=1 and int(chrom)<=22) or chrom in ["X","Y","M"]):
+        errAbort( "invalid chromosome name %s" % chrom)
+
+    return chrom, pos, allele, reference, track
+
+def lookupAllele(chrom, pos, allele, reference, dataset):
+    " check if an allele is present in a sqlite DB "
+    conn = dbOpen()
+    tableList = dbListTables(conn)
+    if dataset!=None:
+        if dataset not in tableList:
+            errAbort("dataset %s is not present on this server" % dataset)
+        tableList = [dataset]
+
+    for tableName in tableList:
+        sql = "SELECT * from %s WHERE chrom=? AND pos=? AND allele=?" % tableName
+        cur = conn.cursor()
+        cur.execute(sql, (chrom, pos, allele))
+        row = cur.fetchone()
+        if row!=None:
+            return "true"
+
+    return "false"
+
+def lookupAlleleJson(chrom, pos, allele, reference, dataset):
+    " call lookupAllele and wrap the result into dictionaries "
+    chrom, pos, allele, reference, dataset = checkParams(chrom, pos, allele, reference, dataset)
+    exists = lookupAllele(chrom, pos, allele, reference, dataset)
+
+    query = {
+        "allele": allele,
+        "chromosome": chrom.replace("chr",""),
+        "position": pos,
+        "reference": reference,
+        "dataset": dataset
+        }
+    ret = {"beacon" : beaconDesc, "query" : query, "response" : {"exists":exists} }
+    return ret
+    
+def main():
+    # detect if running under apache or not
+    if 'REQUEST_METHOD' in os.environ:
+        cgitb.enable()
+        mainCgi()
+    else:
+        mainCommandLine()
+
+def parseArgs():
+    " parse command line options into args and options "
+    parser = optparse.OptionParser("""usage: %prog [options] filename [datasetName] - import VCF or BED files into the beacon database. 
+    The parameter 'datasetName' is optional and defaults to 'defaultDataset'.
+    """) 
+
+    parser.add_option("-d", "--debug", dest="debug", \
+        action="store_true", help="show debug messages") 
+    (options, args) = parser.parse_args()
+
+    if len(args)==0:
+        parser.print_help()
+        sys.exit(0)
+    return args, options
+
+def dbMakeTable(conn, tableName):
+    " create an empty table with chrom/pos/allele fields "
+    conn.execute("DROP TABLE IF EXISTS %s" % tableName)
+    conn.commit()
+
+    _tableDef = (
+    'CREATE TABLE IF NOT EXISTS %s '
+    '('
+    '  chrom text,' # chromosome
+    '  pos int,' # start position, 0-based
+    '  allele text' # alternate allele, can also be IATG = insertion of ATG or D15 = deletion of 15 bp
+    ')')
+    conn.execute(_tableDef % tableName)
+    conn.commit()
+    #'  PRIMARY KEY (chrom, pos, allele) '
+
+def dbOpen():
+    " open the sqlite db and return a DB connection object "
+    dbDir = dirname(__file__) # directory where script is located
+    if hostName.endswith("ucsc.edu"): # data is not in CGI directory at UCSC
+        dbDir = "/gbdb/hg19/beacon/"
+    dbName = join(dbDir, SQLITEDB)
+    #if exclusive==True:
+    conn = sqlite3.Connection(dbName)
+    #else:
+    #print "Opening %s for exclusive use" % dbName
+    #conn = sqlite3.Connection(dbName, isolation_level='exclusive')
+    return conn
+
+def dbListTables(conn):
+    " return list of tables in sqlite db "
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    rows = cursor.fetchall()
+    tables = []
+    for row in rows:
+        tables.append(row[0])
+    return tables
+    
+def dbQuery(conn, query, params):
+    cursor = conn.cursor()
+    if params==None:
+        cursor.execute(query)
+    else:
+        cursor.execute(query, params)
+    return cursor.fetchall()
+
+def readAlleles(ifh):
+    """ read alleles in VCF file 
+        return a list of chrom, pos, allele tuples
+    """
+    doneData = set() # copy of all data, to check for duplicates
+    rows = []
+    skipCount = 0
+    emptyCount = 0
+    gc.disable()
+    for line in ifh:
+        if line.startswith("#"):
+            continue
+        fields = string.split(line.rstrip("\n"), "\t", maxsplit=5)
+        chrom, pos, varId, ref, alt = fields[:5]
+        pos = int(pos)-1 # VCF is 1-based, beacon is 0-based
+        
+        if alt==".":
+            emptyCount += 1
+            continue
+
+        refIsOne = len(ref)==1
+        altIsOne = len(alt)==1
+
+        if refIsOne and altIsOne:
+            # single bp subst
+            beaconAllele = alt
+        elif not refIsOne and altIsOne:
+            # deletion
+            beaconAllele = "D"+str(len(ref)-1) # skip first nucleotide, VCF always adds one nucleotide
+            pos += 1 
+        elif refIsOne and not altIsOne:
+            # insertion
+            beaconAllele = "I"+alt[1:]
+            pos += 1
+        elif not refIsOne and not altIsOne:
+            skipCount +=1
+        else:
+            print "Error: invalid VCF fields:", fields
+            sys.exit(1)
+
+        if len(rows) % 500000 == 0:
+            print "Read %d rows..." % len(rows)
+
+        dataRow = (chrom, pos, beaconAllele)
+        #dataStr = "%s|%d|%s" % (chrom, pos, beaconAllele)
+        if dataRow in doneData:
+            continue
+
+        rows.append( dataRow )
+        doneData.add( dataRow )
+
+        #if len(chunk)==50000:
+            #yield chunk
+            #chunk = []
+
+    #if len(chunk)!=0:
+        #yield chunk
+    print "skipped %d VCF lines with empty ALT alleles" % emptyCount
+    print "skipped %d VCF lines with both ALT and REF alleles len!=1, cannot encode as beacon queries" % skipCount
+    return rows
+
+def iterChunks(seq, size):
+    " yields chunks of at most size elements from seq "
+    for pos in range(0, len(seq), size):
+        yield seq[pos:pos + size]
+
+def printTime(time1, time2, rowCount):
+    timeDiff = time2 - time1
+    print "Time: %f secs for %d rows, %d rows/sec" % (timeDiff, rowCount, rowCount/timeDiff)
+
+def importFile(fileName, datasetName):
+    """ open the sqlite db, create a table datasetName and write the data in fileName into it """
+    conn = dbOpen()
+    dbMakeTable(conn, datasetName)
+
+    # try to make sqlite writes as fast as possible
+    conn.execute("PRAGMA synchronous=OFF")
+    conn.execute("PRAGMA count_changes=OFF") # http://blog.quibb.org/2010/08/fast-bulk-inserts-into-sqlite/
+    conn.execute("PRAGMA cache_size=800000") # http://web.utk.edu/~jplyon/sqlite/SQLite_optimization_FAQ.html
+    conn.execute("PRAGMA journal_mode=OFF") # http://www.sqlite.org/pragma.html#pragma_journal_mode
+    conn.execute("PRAGMA temp_store=memory")
+    conn.commit()
+
+    if fileName.endswith(".gz"):
+        ifh = gzip.open(fileName)
+    else:
+        ifh = open(fileName)
+
+    # see http://stackoverflow.com/questions/1711631/improve-insert-per-second-performance-of-sqlite
+    # for background why I do it like this
+    print "Reading %s" % (fileName)
+    rowCount = 0
+    startTime = time.time()
+    alleles = list(readAlleles(ifh))
+    loadTime = time.time()
+
+    printTime(startTime, loadTime, len(alleles))
+
+    print "Loading alleles into database"
+    for rows in iterChunks(alleles, 50000):
+        sql = "INSERT INTO %s (chrom, pos, allele) VALUES (?,?,?)" % datasetName
+        conn.executemany(sql, rows)
+        conn.commit()
+        rowCount += len(rows)
+    insertTime = time.time()
+    printTime(loadTime, insertTime, len(alleles))
+
+    print "Indexing database table"
+    conn.execute("CREATE UNIQUE INDEX '%s_index' ON '%s' ('chrom', 'pos', 'allele')" % \
+        (datasetName, datasetName))
+    indexTime = time.time()
+    printTime(insertTime, indexTime, len(alleles))
+
+def mainCommandLine():
+    " main function if called from command line "
+    args, options = parseArgs()
+
+    fileName = args[0]
+    if len(args)==2:
+        datasetName = args[1]
+    else:
+        datasetName = "defaultDataset"
+
+    importFile(fileName, datasetName)
+    
+def mainCgi():
+    print "Content-Type: text/html\n"
+
+    url = os.environ["REQUEST_URI"]
+    parsedUrl = urlparse.urlparse(url)
+
+    # get CGI parameters
+    form = cgi.FieldStorage()
+
+    # react based on symlink that was used to call this script
+    page = parsedUrl[2].split("/")[-1] # last part of path is REST endpoint
+    if page=="info":
+        printJson(beaconInfo())
+        sys.exit(0)
+
+    hgBotDelay()
+
+    chrom = form.getfirst("chromosome")
+    pos = form.getfirst("position")
+    allele = form.getfirst("allele")
+    reference = form.getfirst("reference")
+    dataset = form.getfirst("dataset")
+    format = form.getfirst("format")
+
+    if chrom==None and pos==None and allele==None:
+        printHelp()
+        sys.exit(0)
+
+    ret = lookupAlleleJson(chrom, pos, allele, reference, dataset)
+    if format=="text":
+        print ret["response"]["exists"]
+    else:
+        printJson(ret)
+
+if __name__=="__main__":
+    # deactivate this on the RR, but useful for debugging: prints a http header
+    # on errors 
+    main()

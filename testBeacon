@@ -3,8 +3,8 @@ import sys, json, urllib2
 import unittest
 import imp
 
-imp.load_source("hgBeacon", "hgBeacon") # hgBeacon does not have the .py extension
-import hgBeacon
+imp.load_source("query", "query") # hgBeacon does not have the .py extension
+import query as hgBeacon
 
 baseUrl = None
 if len(sys.argv)!=1:
@@ -21,12 +21,12 @@ class TestBeacon(unittest.TestCase):
     def test_outside(self):
         " test query, beacon and null reply "
         maxInt = 2147483646
-        rep = hgBeacon.lookupAllele("1", str(maxInt), "T", "", "test")
+        rep = hgBeacon.lookupAlleleJson("1", str(maxInt), "T", "", "test")
         self.assertTrue(rep["query"]["position"]==maxInt)
         self.assertTrue(rep["query"]["reference"]=="GRCh37")
         self.assertTrue(rep["query"]["allele"]=="T")
         self.assertTrue(rep["query"]["chromosome"]=="1")
-        self.assertTrue(rep["response"]["exists"]=="null")
+        self.assertTrue(rep["response"]["exists"]=="false")
 
         bi = rep["beacon"]
         self.assertTrue(bi["id"] != "")
@@ -36,15 +36,15 @@ class TestBeacon(unittest.TestCase):
         self.assertTrue(bi["api"] != "")
 
     def test_allele(self):
-        " test true reply "
-        pos = 883515
-        rep = hgBeacon.lookupAllele("1", str(pos), "T", "", "test")
+        " test true reply with the ICGC sample"
+        pos = 10150
+        rep = hgBeacon.lookupAlleleJson("1", str(pos), "A", "", "test")
         self.assertTrue(rep["response"]["exists"]=="true")
 
     def test_allele_false(self):
         " test false reply "
-        pos = 883515
-        rep = hgBeacon.lookupAllele("1", str(pos), "A", "", "test")
+        pos = 10000
+        rep = hgBeacon.lookupAlleleJson("1", str(pos), "A", "", "test")
         self.assertTrue(rep["response"]["exists"]=="false")
 
 #if __name__ == '__main__':
