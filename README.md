@@ -77,6 +77,7 @@ Remove the default test database:
 Import a VCF file as a dataset 'icgc':
     ./query icgc simple_somatic_mutation.aggregated.vcf.gz
 
+You can specify multiple filenames, they will get merged into the dataset.
 A typical import speed is 100k rows/sec, so it can take a while if you have millions of variants.
 
 You should now be able to query your new dataset with URLs like this:
@@ -87,8 +88,10 @@ By default, the beacon will check all datasets, unless you provide a dataset nam
 
     wget "http://localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=1234&allele=T&dataset=icgc" -O -
 
-You can run the 'query' script from the command line for a list of the import options.
-Note that beacon users cannot query the database during the import.
+Note that external beacon users cannot query the database during the import.
+
+Apart from VCF, the program can also parse the complete genomics variants format, BED format of LOVD
+and a special format for the database HGMD. You can run the 'query' script from the command line for a list of the import options.
 
 Apache setup
 ============
