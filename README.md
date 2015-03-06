@@ -60,8 +60,8 @@ Usage help info (as shown at UCSC):
 
 Some test queries against the ICGC sample that is part of the repo:
 
-    wget 'http://localhost/cgi-bin/hgBeacon?chromosome=1&position=10150&allele=A' -O -
-    wget 'http://localhost/cgi-bin/hgBeacon?chromosome=10&position=4772339&allele=T' -O -
+    wget 'http://localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=10150&allele=A' -O -
+    wget 'http://localhost/cgi-bin/ucscBeacon/query?chromosome=10&position=4772339&allele=T' -O -
 
 Both should display "true" at the end of the JSON string.
 
@@ -73,7 +73,7 @@ See 'Apache setup' below if this shows an error.
 
 For easier usage from wget or curl, the script supports a parameter 'format=text' which prints only one word (true or false):
 
-    wget 'http://localhost/cgi-bin/hgBeacon?chromosome=10&position=9775129&allele=T&format=text' -O -
+    wget 'http://localhost/cgi-bin/ucscBeacon/query?chromosome=10&position=9775129&allele=T&format=text' -O -
 
 You can rename the "ucscBeacon" directory to any different name, like "beacon" or "myBeacon".
 
