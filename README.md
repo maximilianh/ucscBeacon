@@ -27,7 +27,7 @@ https://docs.google.com/document/d/154GBOixuZxpoPykGKcPOyrYUcgEXVe2NvKx61P4Ybn4
 Installation
 ============
 
-* On Ubuntu:
+On Ubuntu/Debian:
   
     sudo apt-get install apache2 git
     sudo a2enmod cgi
@@ -35,13 +35,13 @@ Installation
     cd /usr/lib/cgi-bin
     git clone https://github.com/maximilianh/ucscBeacon.git 
 
-* On Centos:
+On Centos/Fedora/Redhat:
 
     sudo yum install httpd git
     cd /var/www/cgi-bin
     git clone https://github.com/maximilianh/ucscBeacon.git 
 
-* On OSX (thanks to Patrick Leyshock):
+On OSX (thanks to Patrick Leyshock):
 
     # Uncomment this line in /etc/apache2/httpd.conf
     # LoadModule cgi_module libexec/apache2/mod_cgi.so
