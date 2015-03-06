@@ -512,7 +512,7 @@ def importFiles(fileNames, datasetName, format):
 
     # remove duplicates and sort again
     if len(fileNames)!=1:
-        alleles = set(alleles)
+        alleles = list(set(alleles))
         alleles.sort()
 
     loadTime = time.time()
