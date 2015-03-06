@@ -17,11 +17,11 @@ A Genomics Alliance Beacon, see http://ga4gh.org/#/beacon
   no parameters
 
 Examples:
-%(host)s/cgi-bin/BEACONDIR/query?dataset=test&chromosome=1&position=10150&allele=A
-%(host)s/cgi-bin/BEACONDIR/query?dataset=test&chromosome=1&position=4772339&allele=T
+%(host)s/cgi-bin/ucscBeacon/query?dataset=test&chromosome=1&position=10150&allele=A
+%(host)s/cgi-bin/ucscBeacon/query?dataset=test&chromosome=1&position=4772339&allele=T
 - returns "true", this allele is in the beacon
 
-%(host)s/cgi-bin/BEACONDIR/query?dataset=test&chromosome=1&position=1234&allele=T
+%(host)s/cgi-bin/ucscBeacon/query?dataset=test&chromosome=1&position=1234&allele=T
 - returns "false", this allele is not in the beacon
 
 </pre>

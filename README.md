@@ -27,20 +27,29 @@ https://docs.google.com/document/d/154GBOixuZxpoPykGKcPOyrYUcgEXVe2NvKx61P4Ybn4
 Installation
 ============
 
-Just copy the repo into your cgi-bin directory.
+* On Ubuntu:
+  
+    sudo apt-get install apache2 git
+    sudo a2enmod cgi
+    sudo service apache2 restart
+    cd /usr/lib/cgi-bin
+    git clone https://github.com/maximilianh/ucscBeacon.git 
 
-Under a Redhat-like linux, this is /var/www/cgi-bin, on Ubuntu/Debian systems
-/usr/lib/cgi-bin, on OSX /Library/WebServer/CGI-Executables/.
+* On Centos:
 
-    cd /usr/lib/cgi-bin # adapt for your OS, see above
-    git clone https://github.com/maximilianh/ucscBeacon.git
+    sudo yum install httpd git
+    cd /var/www/cgi-bin
+    git clone https://github.com/maximilianh/ucscBeacon.git 
 
-* Only for Apple OSX (thanks to Patrick Leyshock):
-Uncomment this line in /etc/apache2/httpd.conf:
+* On OSX (thanks to Patrick Leyshock):
 
-        LoadModule cgi_module libexec/apache2/mod_cgi.so
+    # Uncomment this line in /etc/apache2/httpd.conf
+    # LoadModule cgi_module libexec/apache2/mod_cgi.so
+    sudo apachctl -k restart
+    cd /Library/WebServer/CGI-Executables/
+    wget https://github.com/maximilianh/ucscBeacon/archive/master.zip
+    unzip master.zip
 
-then run 'sudo apachctl -k restart'
   
 Test it
 =======
