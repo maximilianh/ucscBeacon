@@ -4,7 +4,7 @@
 # see ga4gh.org/#/beacon (UCSC redmine 14393)
 
 import cgi, subprocess, sys, cgitb, os, socket, time, json, glob, urlparse, time
-import sqlite3, gzip, optparse, gc, string, re
+import sqlite3, gzip, optparse, gc, string, re, socket
 from os.path import join, isfile, dirname, isdir, basename
 
 # general info about this beacon
@@ -116,12 +116,15 @@ def printHelp():
     print "<html><body>"
     host = hostName # convert from global to local var
     if host.endswith(".ucsc.edu"):
-        fname = "helpUcsc.txt"
+        helpDir = "/gbdb/hg19/beacon"
     else:
-        fname = "help.txt"
+        helpDir = dirname(__file__)
 
-    currDir = dirname(__file__)
-    helpText = open(join(currDir, fname)).read()
+    helpPath = join(helpDir, "help.txt")
+    if not isfile(helpPath):
+        errAbort("no file %s found. The beacon is not activated on this machine" % helpPath)
+
+    helpText = open(helpPath).read()
     print helpText % locals()
     print "</body></html>"
     sys.exit(0)
@@ -130,7 +133,7 @@ def dataSetResources():
     " Returns the list of DataSetResources "
     totalSize = 0
     dsrList = []
-    conn = dbOpen()
+    conn = dbOpen(mustExist=True)
     for tableName in dbListTables(conn):
         rows = dbQuery(conn, "SELECT COUNT(*) from %s" % tableName, None)
         itemCount = rows[0][0]
@@ -199,14 +202,14 @@ def checkParams(chrom, pos, allele, reference, track):
     # convert chrom to hg19 format
     if chrom==None:
         errAbort( "missing chromosome parameter")
-    if not ((chrom.isdigit() and int(chrom)>=1 and int(chrom)<=22) or chrom in ["X","Y","M"]):
+    if not ((chrom.isdigit() and int(chrom)>=1 and int(chrom)<=22) or chrom in ["X","Y","M","test"]):
         errAbort( "invalid chromosome name %s" % chrom)
 
     return chrom, pos, allele, reference, track
 
 def lookupAllele(chrom, pos, allele, reference, dataset):
     " check if an allele is present in a sqlite DB "
-    conn = dbOpen()
+    conn = dbOpen(mustExist=True)
     tableList = dbListTables(conn)
     if dataset!=None:
         if dataset not in tableList:
@@ -231,7 +234,11 @@ def lookupAllele(chrom, pos, allele, reference, dataset):
 def lookupAlleleJson(chrom, pos, allele, reference, dataset):
     " call lookupAllele and wrap the result into dictionaries "
     chrom, pos, allele, reference, dataset = checkParams(chrom, pos, allele, reference, dataset)
+
     exists = lookupAllele(chrom, pos, allele, reference, dataset)
+
+    if chrom=="test" and pos==0:
+        exists = "true"
 
     query = {
         "allele": allele,
@@ -244,26 +251,29 @@ def lookupAlleleJson(chrom, pos, allele, reference, dataset):
     return ret
     
 def main():
-    # detect if running under apache or not
+    # detect if running under apache or was run from command line
     if 'REQUEST_METHOD' in os.environ:
-        cgitb.enable()
+        fqdn = socket.getfqdn()
+        if not (fqdn.startswith("hgw") and fqdn.endswith("ucsc.edu")) \
+            or fqdn.startswith("hgwdev."):
+            # enable special CGI error handler not on the RR, but on hgwdev
+            cgitb.enable()
         mainCgi()
     else:
         mainCommandLine()
 
 def parseArgs():
     " parse command line options into args and options "
-    parser = optparse.OptionParser("""usage: %prog [options] filename [datasetName] - import VCF or BED files into the beacon database. 
-    - parameter 'datasetName' is optional and defaults to 'defaultDataset'.
+    parser = optparse.OptionParser("""usage: %prog [options] datasetName filename(s)  - import VCF or BED files into the beacon database. 
     - any existing dataset of the same name will be overwritten
     - the data is written to beaconData.sqlite. You can use 'sqlite3' to inspect the data file.
-    - the input file can be gzipped
+    - the input file(s) can be gzipped
     """)
 
     parser.add_option("-d", "--debug", dest="debug", \
         action="store_true", help="show debug messages") 
     parser.add_option("-f", "--format", dest="format", \
-        action="store", help="format of input file, one of vcf, lovd, hgmd. default %default", \
+        action="store", help="format of input file, one of vcf, lovd, hgmd, cga. default %default", \
         default = "vcf") 
     (options, args) = parser.parse_args()
 
@@ -288,17 +298,16 @@ def dbMakeTable(conn, tableName):
     conn.commit()
     #'  PRIMARY KEY (chrom, pos, allele) '
 
-def dbOpen():
+def dbOpen(mustExist=False):
     " open the sqlite db and return a DB connection object "
     dbDir = dirname(__file__) # directory where script is located
     if hostName.endswith("ucsc.edu"): # data is not in CGI directory at UCSC
         dbDir = "/gbdb/hg19/beacon/"
     dbName = join(dbDir, SQLITEDB)
-    #if exclusive==True:
+
+    if not isfile(dbName) and mustExist:
+        errAbort("Database file %s does not exist. This beacon is not serving any data." % dbName)
     conn = sqlite3.Connection(dbName)
-    #else:
-    #print "Opening %s for exclusive use" % dbName
-    #conn = sqlite3.Connection(dbName, isolation_level='exclusive')
     return conn
 
 def dbListTables(conn):
@@ -430,6 +439,32 @@ def readAllelesHgmd(ifh):
     print "read %d alleles, skipped %d non-SNV alleles" % (len(alleles), skipCount)
     return list(set(alleles))
 
+def readAllelesCga(ifh):
+    """ read a CGA variant file and return in format (chrom, pos, altAllele).
+    See http://blog.personalgenomes.org/2014/05/30/pgp-harvard-data-in-google-cloud-storage/
+    """
+    # 5 2   all chr1    11085   11109   ref =   =
+    # 300     2       1       chr1    22157   22158   snp     A       G       80      80      VQHIGH          dbsnp.80:rs370187
+    alleles = []
+    count = 0
+    skipCount = 0
+    for line in ifh:
+        if line.startswith("#") or len(line)==1:
+            continue
+        fields = line.rstrip("\n").split("\t")
+        if fields[6]!="snp":
+            skipCount += 1
+            continue
+        chrom = fields[3].replace("chr", "")
+        start = int(fields[4])
+        end = int(fields[4])
+        ref = fields[7]
+        alt = fields[8]
+        alleles.append( (chrom, start, alt) )
+
+    print "read %d alleles, skipped %d non-SNP alleles" % (len(alleles), skipCount)
+    return sorted(list(set(alleles)))
+
 def iterChunks(seq, size):
     " yields chunks of at most size elements from seq "
     for pos in range(0, len(seq), size):
@@ -439,7 +474,7 @@ def printTime(time1, time2, rowCount):
     timeDiff = time2 - time1
     print "Time: %f secs for %d rows, %d rows/sec" % (timeDiff, rowCount, rowCount/timeDiff)
 
-def importFile(fileName, datasetName, format):
+def importFiles(fileNames, datasetName, format):
     """ open the sqlite db, create a table datasetName and write the data in fileName into it """
     conn = dbOpen()
     dbMakeTable(conn, datasetName)
@@ -452,24 +487,33 @@ def importFile(fileName, datasetName, format):
     conn.execute("PRAGMA temp_store=memory")
     conn.commit()
 
-    if fileName.endswith(".gz"):
-        ifh = gzip.open(fileName)
-    else:
-        ifh = open(fileName)
-
     # see http://stackoverflow.com/questions/1711631/improve-insert-per-second-performance-of-sqlite
     # for background why I do it like this
-    print "Reading %s into database table %s" % (fileName, datasetName)
+    print "Reading files %s into database table %s" % (",".join(fileNames), datasetName)
     rowCount = 0
     startTime = time.time()
 
-    if format=="vcf":
-        alleles = readAllelesVcf(ifh)
-    elif format=="lovd":
-        alleles = readAllelesLovd(ifh)
-    elif format=="hgmd":
-        alleles = readAllelesHgmd(ifh)
-        
+    alleles = []
+
+    for fileName in fileNames:
+        if fileName.endswith(".gz"):
+            ifh = gzip.open(fileName)
+        else:
+            ifh = open(fileName)
+
+        if format=="vcf":
+            alleles.extend(readAllelesVcf(ifh))
+        elif format=="lovd":
+            alleles.extend(readAllelesLovd(ifh))
+        elif format=="hgmd":
+            alleles.extend(readAllelesHgmd(ifh))
+        elif format=="cga":
+            alleles.extend(readAllelesCga(ifh))
+
+    # remove duplicates and sort again
+    if len(fileNames)!=1:
+        alleles = set(alleles)
+        alleles.sort()
 
     loadTime = time.time()
 
@@ -494,13 +538,13 @@ def mainCommandLine():
     " main function if called from command line "
     args, options = parseArgs()
 
-    fileName = args[0]
-    if len(args)==2:
-        datasetName = args[1]
-    else:
-        datasetName = "defaultDataset"
+    datasetName = args[0]
+    fileNames = args[1:]
+    if len(args)<2:
+        print("You need to specify at least a datasetName and one fileName")
+        sys.exit(1)
 
-    importFile(fileName, datasetName, options.format)
+    importFiles(fileNames, datasetName, options.format)
     
 def mainCgi():
     print "Content-Type: text/html\n"

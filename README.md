@@ -75,7 +75,7 @@ Remove the default test database:
     mv beaconData.sqlite beaconData.sqlite.old
 
 Import a VCF file as a dataset 'icgc':
-    ./query simple_somatic_mutation.aggregated.vcf.gz icgc
+    ./query icgc simple_somatic_mutation.aggregated.vcf.gz
 
 A typical import speed is 100k rows/sec, so it can take a while if you have millions of variants.
 

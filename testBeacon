@@ -2,9 +2,14 @@
 import sys, json, urllib2
 import unittest
 import imp
+import os.path
 
-imp.load_source("query", "query") # hgBeacon does not have the .py extension
-import query as hgBeacon
+if os.path.isfile("query"):
+    imp.load_source("query", "query") # hgBeacon does not have the .py extension
+    import query as hgBeacon
+else:
+    imp.load_source("hgBeacon", "hgBeacon") # hgBeacon does not have the .py extension
+    import hgBeacon
 
 baseUrl = None
 if len(sys.argv)!=1:
@@ -15,7 +20,7 @@ def queryServer(chrom, pos, allele, reference, dataset):
     if baseUrl == None:
         ret = hgBeacon.lookupAlleleJson(chrom, pos, allele, reference, dataset)
     else:
-        url = baseUrl+"/query?chromosome=%s&position=%s&allele=%s" % (chrom, str(pos), allele)
+        url = baseUrl+"?chromosome=%s&position=%s&allele=%s" % (chrom, str(pos), allele)
         if reference!="":
             url=url+"&reference=%s" % reference
         if dataset!="":
