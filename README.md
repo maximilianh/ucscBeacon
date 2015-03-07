@@ -2,8 +2,8 @@ Introduction
 ============
 
 The GA4H beacon system http://ga4gh.org/#/beacon is a small webservice
-that accepts a chromosome position and allele and replies with "yes", "no" if
-it finds information about the allele.  The purpose of the system is not
+that accepts a chromosome position and allele and replies with "yes" if
+it finds information about the allele, "no" otherwise.  The purpose of the system is not
 maximum data transfer, but limiting information, to prevent the identification
 of patients or at least make it very hard to identify them.
 
