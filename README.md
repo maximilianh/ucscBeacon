@@ -2,10 +2,10 @@ Introduction
 ============
 
 The GA4H beacon system http://ga4gh.org/#/beacon is a small webservice
-that accepts a chromosome position and allele and replies with "yes" if
-it finds information about the allele, "no" otherwise.  The purpose of the system is not
-maximum data transfer, but limiting information, to prevent the identification
-of patients or at least make it very hard to identify them.
+that accepts a chromosome position and allele and replies with "true" if
+it finds information about the allele, "false" otherwise.  The purpose of the
+system is not maximum data transfer, but limiting information, to prevent the
+identification of patients or at least make it hard to identify them.
 
 This is an implementation of the GA4GH beacon 0.2 draft API with minimum
 dependencies which can be installed by simply copying it into a webserver directory.
@@ -13,17 +13,14 @@ dependencies which can be installed by simply copying it into a webserver direct
 This implementation consists of a single python script.
 The whole git repo can be cloned into a apache cgi-bin directory and should run as-is.
 The script has no other dependencies, only needs a Python > 2.5, which
-is the default in all current linux distributions and OSX (exception: CentOS 5).
+is the default in all current linux distributions and OSX with the exception of Centos/RHEL 5.
 
 Your raw data, like VCF (see below) are not accessed by the script, but converted
-into the minimal format chrom-position-allele. To keep the security
+into the minimal format chrom-position-alternateBases. To keep the security
 implications minimal, the script is small and runs within your existing Apache webserver or 
 any other webserver that supports CGI. The script can slow down queries if too
-man come in from the same IP address, to prevent that someone queries the whole
-genome (see below).
-
-Current Beacon API draft 0.2 reference is at
-https://docs.google.com/document/d/154GBOixuZxpoPykGKcPOyrYUcgEXVe2NvKx61P4Ybn4
+many come in from the same IP address, to prevent that someone queries the whole
+genome (see the end of this document).
 
 Installation
 ============
@@ -61,20 +58,20 @@ Usage help info (as shown at UCSC):
 
 Some test queries against the ICGC sample that is part of the repo:
 
-    wget 'http://localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=10150&allele=A' -O -
-    wget 'http://localhost/cgi-bin/ucscBeacon/query?chromosome=10&position=4772339&allele=T' -O -
+    wget 'http://localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=10150&alternateBases=A&format=text' -O -
+    wget 'http://localhost/cgi-bin/ucscBeacon/query?chromosome=10&position=4772339&alternateBases=T&format=text' -O -
 
-Both should display "true" at the end of the JSON string.
+Both should display "true".
 
-Test if the symlink works:
+Test if the "info" symlink to the script works which shows some basic info about the beacon which you can adapt to your institution as needed:
 
     wget 'http://localhost/cgi-bin/ucscBeacon/info' -O -
 
 See 'Apache setup' below if this shows an error.
 
-For easier usage from wget or curl, the script supports a parameter 'format=text' which prints only one word (true or false):
+For easier usage, the script supports a parameter 'format=text' which prints only one word (true or false). If you don't specify it, the result will be returned as a JSON string, which includes the query parameters:
 
-    wget 'http://localhost/cgi-bin/ucscBeacon/query?chromosome=10&position=9775129&allele=T&format=text' -O -
+    wget 'http://localhost/cgi-bin/ucscBeacon/query?chromosome=10&position=9775129&alternateBases=T' -O -
 
 You can rename the "ucscBeacon" directory to any different name, like "beacon" or "myBeacon".
 
@@ -92,11 +89,11 @@ A typical import speed is 100k rows/sec, so it can take a while if you have mill
 
 You should now be able to query your new dataset with URLs like this:
 
-    wget "http://localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=1234&allele=T" -O -
+    wget "http://localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=1234&alternateBases=T" -O -
 
 By default, the beacon will check all datasets, unless you provide a dataset name, like this:
 
-    wget "http://localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=1234&allele=T&dataset=icgc" -O -
+    wget "http://localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=1234&alternateBases=T&dataset=icgc" -O -
 
 Note that external beacon users cannot query the database during the import.
 
