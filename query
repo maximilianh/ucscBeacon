@@ -231,17 +231,18 @@ def lookupAllele(chrom, pos, allele, reference, dataset):
 
     return "false"
 
-def lookupAlleleJson(chrom, pos, allele, reference, dataset):
+def lookupAlleleJson(chrom, pos, altBases, refBases, reference, dataset):
     " call lookupAllele and wrap the result into dictionaries "
-    chrom, pos, allele, reference, dataset = checkParams(chrom, pos, allele, reference, dataset)
+    chrom, pos, altBases, reference, dataset = checkParams(chrom, pos, altBases, reference, dataset)
 
-    exists = lookupAllele(chrom, pos, allele, reference, dataset)
+    exists = lookupAllele(chrom, pos, altBases, reference, dataset)
 
     if chrom=="test" and pos==0:
         exists = "true"
 
     query = {
-        "allele": allele,
+        "alternateBases": altBases,
+        "referenceBases" : refBases,
         "chromosome": chrom.replace("chr",""),
         "position": pos,
         "reference": reference,
@@ -264,16 +265,17 @@ def main():
 
 def parseArgs():
     " parse command line options into args and options "
-    parser = optparse.OptionParser("""usage: %prog [options] datasetName filename(s)  - import VCF or BED files into the beacon database. 
+    parser = optparse.OptionParser("""usage: %prog [options] filename [datasetName] - import VCF or BED files into the beacon database. 
+    - parameter 'datasetName' is optional and defaults to 'defaultDataset'.
     - any existing dataset of the same name will be overwritten
     - the data is written to beaconData.sqlite. You can use 'sqlite3' to inspect the data file.
-    - the input file(s) can be gzipped
+    - the input file can be gzipped
     """)
 
     parser.add_option("-d", "--debug", dest="debug", \
         action="store_true", help="show debug messages") 
     parser.add_option("-f", "--format", dest="format", \
-        action="store", help="format of input file, one of vcf, lovd, hgmd, cga. default %default", \
+        action="store", help="format of input file, one of vcf, lovd, hgmd. default %default", \
         default = "vcf") 
     (options, args) = parser.parse_args()
 
@@ -439,32 +441,6 @@ def readAllelesHgmd(ifh):
     print "read %d alleles, skipped %d non-SNV alleles" % (len(alleles), skipCount)
     return list(set(alleles))
 
-def readAllelesCga(ifh):
-    """ read a CGA variant file and return in format (chrom, pos, altAllele).
-    See http://blog.personalgenomes.org/2014/05/30/pgp-harvard-data-in-google-cloud-storage/
-    """
-    # 5 2   all chr1    11085   11109   ref =   =
-    # 300     2       1       chr1    22157   22158   snp     A       G       80      80      VQHIGH          dbsnp.80:rs370187
-    alleles = []
-    count = 0
-    skipCount = 0
-    for line in ifh:
-        if line.startswith("#") or len(line)==1:
-            continue
-        fields = line.rstrip("\n").split("\t")
-        if fields[6]!="snp":
-            skipCount += 1
-            continue
-        chrom = fields[3].replace("chr", "")
-        start = int(fields[4])
-        end = int(fields[4])
-        ref = fields[7]
-        alt = fields[8]
-        alleles.append( (chrom, start, alt) )
-
-    print "read %d alleles, skipped %d non-SNP alleles" % (len(alleles), skipCount)
-    return sorted(list(set(alleles)))
-
 def iterChunks(seq, size):
     " yields chunks of at most size elements from seq "
     for pos in range(0, len(seq), size):
@@ -474,7 +450,7 @@ def printTime(time1, time2, rowCount):
     timeDiff = time2 - time1
     print "Time: %f secs for %d rows, %d rows/sec" % (timeDiff, rowCount, rowCount/timeDiff)
 
-def importFiles(fileNames, datasetName, format):
+def importFile(fileName, datasetName, format):
     """ open the sqlite db, create a table datasetName and write the data in fileName into it """
     conn = dbOpen()
     dbMakeTable(conn, datasetName)
@@ -487,33 +463,24 @@ def importFiles(fileNames, datasetName, format):
     conn.execute("PRAGMA temp_store=memory")
     conn.commit()
 
+    if fileName.endswith(".gz"):
+        ifh = gzip.open(fileName)
+    else:
+        ifh = open(fileName)
+
     # see http://stackoverflow.com/questions/1711631/improve-insert-per-second-performance-of-sqlite
     # for background why I do it like this
-    print "Reading files %s into database table %s" % (",".join(fileNames), datasetName)
+    print "Reading %s into database table %s" % (fileName, datasetName)
     rowCount = 0
     startTime = time.time()
 
-    alleles = []
-
-    for fileName in fileNames:
-        if fileName.endswith(".gz"):
-            ifh = gzip.open(fileName)
-        else:
-            ifh = open(fileName)
-
-        if format=="vcf":
-            alleles.extend(readAllelesVcf(ifh))
-        elif format=="lovd":
-            alleles.extend(readAllelesLovd(ifh))
-        elif format=="hgmd":
-            alleles.extend(readAllelesHgmd(ifh))
-        elif format=="cga":
-            alleles.extend(readAllelesCga(ifh))
-
-    # remove duplicates and sort again
-    if len(fileNames)!=1:
-        alleles = list(set(alleles))
-        alleles.sort()
+    if format=="vcf":
+        alleles = readAllelesVcf(ifh)
+    elif format=="lovd":
+        alleles = readAllelesLovd(ifh)
+    elif format=="hgmd":
+        alleles = readAllelesHgmd(ifh)
+        
 
     loadTime = time.time()
 
@@ -538,13 +505,13 @@ def mainCommandLine():
     " main function if called from command line "
     args, options = parseArgs()
 
-    datasetName = args[0]
-    fileNames = args[1:]
-    if len(args)<2:
-        print("You need to specify at least a datasetName and one fileName")
-        sys.exit(1)
+    fileName = args[0]
+    if len(args)==2:
+        datasetName = args[1]
+    else:
+        datasetName = "defaultDataset"
 
-    importFiles(fileNames, datasetName, options.format)
+    importFile(fileName, datasetName, options.format)
     
 def mainCgi():
     print "Content-Type: text/html\n"
@@ -565,16 +532,17 @@ def mainCgi():
 
     chrom = form.getfirst("chromosome")
     pos = form.getfirst("position")
-    allele = form.getfirst("allele")
+    refBases = form.getfirst("referenceBases")
+    altBases = form.getfirst("alternateBases")
     reference = form.getfirst("reference")
     dataset = form.getfirst("dataset")
     format = form.getfirst("format")
 
-    if chrom==None and pos==None and allele==None:
+    if chrom==None and pos==None and altBases==None:
         printHelp()
         sys.exit(0)
 
-    ret = lookupAlleleJson(chrom, pos, allele, reference, dataset)
+    ret = lookupAlleleJson(chrom, pos, altBases, refBases, reference, dataset)
     if format=="text":
         print ret["response"]["exists"]
     else:
