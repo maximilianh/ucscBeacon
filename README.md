@@ -75,16 +75,22 @@ For easier usage, the script supports a parameter 'format=text' which prints onl
 
 You can rename the "ucscBeacon" directory to any different name, like "beacon" or "myBeacon".
 
-Adding your own VCF data
-========================
+Adding your own data
+====================
 
 Remove the default test database:
     mv beaconData.sqlite beaconData.sqlite.old
 
-Import a VCF file as a dataset 'icgc':
+Import some of the provided test files in complete genomics format:
+    ./query testDataCga test/var-GS000015188-ASM.tsv test/var-GS000015188-ASM2.tsv -f cga
+
+Or import some of the provided test files in complete genomics format:
+    ./query testDataVcf test/icgcTest.vcf test/icgcTest2.vcf
+
+Or import your own VCF file as a dataset 'icgc':
     ./query icgc simple_somatic_mutation.aggregated.vcf.gz
 
-You can specify multiple filenames, they will get merged into the dataset.
+You can specify multiple filenames, so the data will get merged.
 A typical import speed is 100k rows/sec, so it can take a while if you have millions of variants.
 
 You should now be able to query your new dataset with URLs like this:
