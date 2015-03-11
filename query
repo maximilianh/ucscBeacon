@@ -441,6 +441,32 @@ def readAllelesHgmd(ifh):
     print "read %d alleles, skipped %d non-SNV alleles" % (len(alleles), skipCount)
     return list(set(alleles))
 
+def readAllelesCga(ifh):
+    """ read a CGA variant file and return in format (chrom, pos, altAllele).
+    See http://blog.personalgenomes.org/2014/05/30/pgp-harvard-data-in-google-cloud-storage/
+    """
+    # 5 2   all chr1    11085   11109   ref =   =
+    # 300     2       1       chr1    22157   22158   snp     A       G       80      80      VQHIGH          dbsnp.80:rs370187
+    alleles = []
+    count = 0
+    skipCount = 0
+    for line in ifh:
+        if line.startswith("#") or len(line)==1:
+            continue
+        fields = line.rstrip("\n").split("\t")
+        if fields[6]!="snp":
+            skipCount += 1
+            continue
+        chrom = fields[3].replace("chr", "")
+        start = int(fields[4])
+        end = int(fields[4])
+        ref = fields[7]
+        alt = fields[8]
+        alleles.append( (chrom, start, alt) )
+
+    print "read %d alleles, skipped %d non-SNP alleles" % (len(alleles), skipCount)
+    return sorted(list(set(alleles)))
+
 def readAllelesBed(ifh):
     """ read a bed file with the format chrom, start, end, allele
     e.g. "chr1    889637  889638  C"
@@ -473,7 +499,7 @@ def printTime(time1, time2, rowCount):
     timeDiff = time2 - time1
     print "Time: %f secs for %d rows, %d rows/sec" % (timeDiff, rowCount, rowCount/timeDiff)
 
-def importFile(fileName, datasetName, format):
+def importFiles(fileNames, datasetName, format):
     """ open the sqlite db, create a table datasetName and write the data in fileName into it """
     conn = dbOpen()
     dbMakeTable(conn, datasetName)
@@ -486,25 +512,35 @@ def importFile(fileName, datasetName, format):
     conn.execute("PRAGMA temp_store=memory")
     conn.commit()
 
-    if fileName.endswith(".gz"):
-        ifh = gzip.open(fileName)
-    else:
-        ifh = open(fileName)
-
     # see http://stackoverflow.com/questions/1711631/improve-insert-per-second-performance-of-sqlite
     # for background why I do it like this
-    print "Reading %s into database table %s" % (fileName, datasetName)
-    rowCount = 0
+    print "Reading files %s into database table %s" % (",".join(fileNames), datasetName)
+    rowCount = 0  
     startTime = time.time()
-
-    if format=="vcf":
-        alleles = readAllelesVcf(ifh)
-    elif format=="lovd":
-        alleles = readAllelesLovd(ifh)
-    elif format=="hgmd":
-        alleles = readAllelesHgmd(ifh)
-    elif format=="bed":
-        alleles = readAllelesBed(ifh)
+   
+    alleles = []
+  
+    for fileName in fileNames:
+        if fileName.endswith(".gz"):
+            ifh = gzip.open(fileName)
+        else:
+            ifh = open(fileName)
+  
+        if format=="vcf":
+            alleles.extend(readAllelesVcf(ifh))
+        elif format=="lovd":
+            alleles.extend(readAllelesLovd(ifh))
+        elif format=="hgmd":
+            alleles.extend(readAllelesHgmd(ifh))
+        elif format=="cga":
+            alleles.extend(readAllelesCga(ifh))
+        elif format=="bed":
+            alleles.extend(readAllelesBed(ifh))
+  
+    # remove duplicates and sort again  
+    if len(fileNames)!=1:
+        alleles = list(set(alleles))
+        alleles.sort()
 
     loadTime = time.time()
 
@@ -529,13 +565,13 @@ def mainCommandLine():
     " main function if called from command line "
     args, options = parseArgs()
 
-    fileName = args[0]
-    if len(args)==2:
-        datasetName = args[1]
-    else:
-        datasetName = "defaultDataset"
+    datasetName = args[0]
+    fileNames = args[1:]
+    if len(args)<2:
+        print("You need to specify at least a datasetName and one fileName")
+        sys.exit(1)
 
-    importFile(fileName, datasetName, options.format)
+    importFiles(fileNames, datasetName, options.format)
     
 def mainCgi():
     print "Content-Type: text/html\n"
