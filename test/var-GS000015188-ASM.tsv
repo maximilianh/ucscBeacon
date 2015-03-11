@@ -1,0 +1,84 @@
+#ASSEMBLY_ID	GS000015188-ASM
+#COSMIC	COSMIC v48
+#DBSNP_BUILD	dbSNP build 132
+#GENOME_REFERENCE	NCBI build 37
+#SAMPLE	GS01669-DNA_D04
+#GENERATED_BY	cgatools
+#GENERATED_AT	2012-Oct-18 05:12:39.235463
+#SOFTWARE_VERSION	2.0.4.14
+#FORMAT_VERSION	2.0
+#GENERATED_BY	dbsnptool
+#TYPE	VAR-ANNOTATION
+
+>locus	ploidy	allele	chromosome	begin	end	varType	reference	alleleSeq	varScoreVAF	varScoreEAF	varQuality	hapLink	xRef
+1	2	all	chr1	0	10000	no-ref	=	?					
+2	2	all	chr1	10000	11029	no-call	=	?					
+3	2	all	chr1	11029	11051	ref	=	=					
+4	2	all	chr1	11051	11085	no-call	=	?					
+5	2	all	chr1	11085	11109	ref	=	=					
+6	2	all	chr1	11109	11152	no-call	=	?					
+7	2	all	chr1	11152	11163	ref	=	=					
+8	2	all	chr1	11163	11170	no-call	=	?					
+236	2	all	chr1	19636	19643	no-call	=	?					
+237	2	all	chr1	19643	19771	ref	=	=					
+238	2	all	chr1	19771	19791	no-call	=	?					
+239	2	all	chr1	19791	19854	ref	=	=					
+240	2	all	chr1	19854	19868	no-call	=	?					
+241	2	all	chr1	19868	19938	ref	=	=					
+242	2	all	chr1	19938	19955	no-call	=	?					
+243	2	all	chr1	19955	20033	ref	=	=					
+244	2	all	chr1	20033	20040	no-call	=	?					
+245	2	all	chr1	20040	20091	ref	=	=					
+246	2	all	chr1	20091	20132	no-call	=	?					
+247	2	all	chr1	20132	20140	ref	=	=					
+248	2	all	chr1	20140	20169	no-call	=	?					
+249	2	all	chr1	20169	20187	ref	=	=					
+250	2	all	chr1	20187	20230	no-call	=	?					
+251	2	all	chr1	20230	20241	ref	=	=					
+252	2	all	chr1	20241	20253	no-call	=	?					
+253	2	all	chr1	20253	20300	ref	=	=					
+254	2	all	chr1	20300	20325	no-call	=	?					
+255	2	all	chr1	20325	20463	ref	=	=					
+256	2	all	chr1	20463	20470	no-call	=	?					
+257	2	all	chr1	20470	20508	ref	=	=					
+258	2	all	chr1	20508	20515	no-call	=	?					
+259	2	all	chr1	20515	20590	ref	=	=					
+260	2	all	chr1	20590	20631	no-call	=	?					
+261	2	all	chr1	20631	20707	ref	=	=					
+262	2	all	chr1	20707	20747	no-call	=	?					
+263	2	all	chr1	20747	20800	ref	=	=					
+264	2	all	chr1	20800	20817	no-call	=	?					
+265	2	all	chr1	20817	20858	ref	=	=					
+266	2	all	chr1	20858	20869	no-call	=	?					
+267	2	all	chr1	20869	20901	ref	=	=					
+268	2	all	chr1	20901	20938	no-call	=	?					
+269	2	all	chr1	20938	20956	ref	=	=					
+270	2	all	chr1	20956	20988	no-call	=	?					
+271	2	all	chr1	20988	21006	ref	=	=					
+272	2	all	chr1	21006	21039	no-call	=	?					
+273	2	all	chr1	21039	21089	ref	=	=					
+274	2	all	chr1	21089	21125	no-call	=	?					
+275	2	all	chr1	21125	21220	ref	=	=					
+276	2	all	chr1	21220	21235	no-call	=	?					
+277	2	all	chr1	21235	21278	ref	=	=					
+278	2	all	chr1	21278	21285	no-call	=	?					
+279	2	all	chr1	21285	21315	ref	=	=					
+280	2	all	chr1	21315	21355	no-call	=	?					
+281	2	all	chr1	21355	21407	ref	=	=					
+282	2	all	chr1	21407	21434	no-call	=	?					
+283	2	all	chr1	21434	21476	ref	=	=					
+284	2	all	chr1	21476	21518	no-call	=	?					
+285	2	all	chr1	21518	21579	ref	=	=					
+286	2	1	chr1	21579	21580	snp	C	T	199	199	VQHIGH		dbsnp.83:rs526642
+286	2	2	chr1	21579	21580	no-call	C	?					
+296	2	all	chr1	21987	22028	no-call	=	?					
+297	2	all	chr1	22028	22066	ref	=	=					
+298	2	all	chr1	22066	22116	no-call	=	?					
+299	2	all	chr1	22116	22157	ref	=	=					
+300	2	1	chr1	22157	22158	snp	A	G	80	80	VQHIGH		dbsnp.80:rs370187
+300	2	2	chr1	22157	22158	no-call	A	?					
+301	2	all	chr1	22158	22191	ref	=	=					
+302	2	all	chr1	22191	22221	no-call	=	?					
+303	2	all	chr1	22221	22301	ref	=	=					
+304	2	all	chr1	22301	22341	no-call	=	?					
+305	2	all	chr1	22341	22388	ref	=	=					
