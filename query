@@ -441,6 +441,29 @@ def readAllelesHgmd(ifh):
     print "read %d alleles, skipped %d non-SNV alleles" % (len(alleles), skipCount)
     return list(set(alleles))
 
+def readAllelesBed(ifh):
+    """ read a bed file with the format chrom, start, end, allele
+    e.g. "chr1    889637  889638  C"
+    """
+    alleles = []
+    count = 0
+    skipCount = 0
+    for line in ifh:
+        fields = line.rstrip("\n").split("\t")
+        chrom, start, end, alt = fields[:4]
+        start = int(start)
+        end = int(end)
+
+        if (end-start)!=1:
+            skipCount += 1
+            continue
+
+        chrom = chrom.replace("chr", "")
+        alleles.append( (chrom, start, alt) )
+
+    print "read %d alleles, skipped %d alleles with length <> 1-bp" % (len(alleles), skipCount)
+    return list(set(alleles))
+
 def iterChunks(seq, size):
     " yields chunks of at most size elements from seq "
     for pos in range(0, len(seq), size):
@@ -480,7 +503,8 @@ def importFile(fileName, datasetName, format):
         alleles = readAllelesLovd(ifh)
     elif format=="hgmd":
         alleles = readAllelesHgmd(ifh)
-        
+    elif format=="bed":
+        alleles = readAllelesBed(ifh)
 
     loadTime = time.time()
 
