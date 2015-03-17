@@ -39,7 +39,7 @@ On Centos/Fedora/Redhat:
     cd /var/www/cgi-bin
     git clone https://github.com/maximilianh/ucscBeacon.git 
 
-On OSX (thanks to Patrick Leyshock):
+On OSX (thanks to Patrick Leyshock and Andrew Zimmer):
 
     # Uncomment this line in /etc/apache2/httpd.conf
     # LoadModule cgi_module libexec/apache2/mod_cgi.so
