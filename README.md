@@ -45,8 +45,8 @@ On OSX (thanks to Patrick Leyshock):
     # LoadModule cgi_module libexec/apache2/mod_cgi.so
     sudo apachctl -k restart
     cd /Library/WebServer/CGI-Executables/
-    curl https://github.com/maximilianh/ucscBeacon/archive/master.zip > master.zip
-    unzip master.zip
+    curl -L -G https://github.com/maximilianh/ucscBeacon/archive/master.zip -o beacon.zip
+    unzip beacon.zip
 
   
 Test it
