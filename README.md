@@ -166,7 +166,7 @@ You can replace /usr/lib/cgi-bin with any other directory you prefer.
 The utils/ directory
 ====================
 
-The binary tool in this directory is a static 64bit file distributed
+The binary "bottleneck" tool in this directory is a static 64bit file distributed
 by UCSC.
 
 It can be downloaded for other platforms from
