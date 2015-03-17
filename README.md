@@ -45,7 +45,7 @@ On OSX (thanks to Patrick Leyshock):
     # LoadModule cgi_module libexec/apache2/mod_cgi.so
     sudo apachctl -k restart
     cd /Library/WebServer/CGI-Executables/
-    wget https://github.com/maximilianh/ucscBeacon/archive/master.zip
+    curl https://github.com/maximilianh/ucscBeacon/archive/master.zip > master.zip
     unzip master.zip
 
   
@@ -56,10 +56,19 @@ Usage help info (as shown at UCSC):
 
     wget 'http://localhost/cgi-bin/ucscBeacon/query' -O -
 
+or alternatively with curl, e.g. on OSX:
+
+    curl http://localhost/cgi-bin/ucscBeacon/query
+
 Some test queries against the ICGC sample that is part of the repo:
 
     wget 'http://localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=10150&alternateBases=A&format=text' -O -
     wget 'http://localhost/cgi-bin/ucscBeacon/query?chromosome=10&position=4772339&alternateBases=T&format=text' -O -
+
+or alternatively using curl, e.g. on OSX:
+
+    curl 'http://localhost/cgi-bin/ucscBeacon/query?chromosome=1&position=10150&alternateBases=A&format=text'
+    curl 'http://localhost/cgi-bin/ucscBeacon/query?chromosome=10&position=4772339&alternateBases=T&format=text'
 
 Both should display "true".
 
