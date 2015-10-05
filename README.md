@@ -172,7 +172,7 @@ but you may still want to show a nice form to query it. To do this, copy the
 index.html to the root of your web server, e.g. /var/www/ (Ubuntu) or /var/www/html (Redhat).
 You will have to adapt this line
 
-    &lt;form action="/cgi-bin/ucscBeacon/query" method="get"&gt;
+    <form action="/cgi-bin/ucscBeacon/query" method="get">
 
 and replace /cgi-bin/ucscBeacon/query with the location of the query script on your web server.
 
