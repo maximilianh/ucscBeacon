@@ -265,7 +265,7 @@ def main():
 
 def parseArgs():
     " parse command line options into args and options "
-    parser = optparse.OptionParser("""usage: %prog [options] filename [datasetName] - import VCF or BED files into the beacon database. 
+    parser = optparse.OptionParser("""usage: %prog [options] [datasetName] filename(s) - import VCF or BED files into the beacon database. 
     - parameter 'datasetName' is optional and defaults to 'defaultDataset'.
     - any existing dataset of the same name will be overwritten
     - the data is written to beaconData.sqlite. You can use 'sqlite3' to inspect the data file.
