@@ -351,6 +351,8 @@ def readAllelesVcf(ifh):
             continue
         fields = string.split(line.rstrip("\n"), "\t", maxsplit=5)
         chrom, pos, varId, ref, alt = fields[:5]
+        if chrom.startswith("chr"):
+            chrom = chrom.replace("chr","")
         pos = int(pos)-1 # VCF is 1-based, beacon is 0-based
         
         if alt==".":
