@@ -169,7 +169,7 @@ The index.html page
 There is a page index.html in case you want a nicer user interface to your
 beacon. The beacon is not supposed to be used by humans, as it is an API 
 but you may still want to show a nice form to query it. To do this, copy the
-index.html to the root of your web server, e.g. /var/www/ (Ubuntu) or /var/www/html (Redhat).
+index.html to the root of your web server, e.g. /var/www/html (Ubuntu/Redhat).
 You will have to adapt this line
 
     <form action="/cgi-bin/ucscBeacon/query" method="get">
