@@ -22,8 +22,28 @@ any other webserver that supports CGI. The script can slow down queries if too
 many come in from the same IP address, to prevent that someone queries the whole
 genome (see the end of this document).
 
-Installation
-============
+Quick-start using the built-in webserver
+=======================================
+
+This should work in OSX, Linux or Windows when Python is installed (in Windows you need to rename query to query.py):
+
+    ./query -p 8888
+
+Then go to your web browser and try a few URLs:
+
+* http://localhost:8888/query?dataset=test&chromosome=1&position=10150&allele=A&format=text
+* http://localhost:8888/query?dataset=test&chromosome=1&position=10150&allele=A
+* http://localhost:8888/query?dataset=test&chromosome=1&position=10150&allele=C
+
+Reset the databse and import your own data in VCF format (see below for other supported formats):
+
+    rm beaconData.sqlite
+    ./query test yourData.vcf.gz
+
+And query again with URLs, as above.
+
+Installation in Apache
+======================
 
 On Ubuntu/Debian:
   
