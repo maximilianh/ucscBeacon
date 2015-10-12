@@ -7,6 +7,11 @@ import cgi, subprocess, sys, cgitb, os, socket, time, json, glob, urlparse, time
 import sqlite3, gzip, optparse, gc, string, re, socket
 from os.path import join, isfile, dirname, isdir, basename
 
+try:
+    import cherrypy
+except:
+    pass # in case user hasn't installed cherrypy
+    
 # general info about this beacon
 hostName = os.environ.get("HTTP_HOST", "localhost")
 homepage = "http://%s/cgi-bin/hgBeacon" % hostName
@@ -281,7 +286,7 @@ def parseArgs():
         default = "vcf") 
     (options, args) = parser.parse_args()
 
-    if len(args)==0:
+    if len(args)==0 and not options.port:
         parser.print_help()
         sys.exit(0)
     return args, options
@@ -570,9 +575,20 @@ def importFiles(fileNames, datasetName, format):
     indexTime = time.time()
     printTime(insertTime, indexTime, len(alleles))
 
+class HelloWorld(object):
+    @cherrypy.expose
+    def index(self):
+        return "Hello world!"
+
 def mainCommandLine():
     " main function if called from command line "
     args, options = parseArgs()
+
+    if options.port:
+        portNum = options.port
+        import cherrypy
+        cherrypy.config.update({'server.socket_port': portNum})
+        cherrypy.quickstart(HelloWorld())
 
     datasetName = args[0]
     fileNames = args[1:]
