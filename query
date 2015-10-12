@@ -590,6 +590,9 @@ if cherryPyLoaded:
                 alternateBases = allele
             return beaconQuery(chromosome, position, referenceBases, alternateBases, reference, dataset, format)
 
+        def info(self):
+            return makeJson(beaconInfo())
+
 def startDevServer(port):
     " start the development webserver "
     if not cherryPyLoaded:
@@ -637,7 +640,7 @@ def mainCgi():
     # react based on symlink that was used to call this script
     page = parsedUrl[2].split("/")[-1] # last part of path is REST endpoint
     if page=="info":
-        rpintJson(beaconInfo())
+        print makeJson(beaconInfo())
         sys.exit(0)
 
     hgBotDelay()
