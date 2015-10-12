@@ -27,6 +27,8 @@ Quick-start using the built-in webserver
 
 This should work in OSX, Linux or Windows when Python is installed (in Windows you need to rename query to query.py):
 
+    git clone https://github.com/maximilianh/ucscBeacon.git 
+    cd ucscBeacon
     ./query -p 8888
 
 Then go to your web browser and try a few URLs:
