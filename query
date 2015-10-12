@@ -185,9 +185,9 @@ def checkParams(chrom, pos, allele, reference, track):
         errAbort("missing allele parameter")
 
     allele = allele.upper()
-    if not (re.compile("[ACTG]+").match(allele)!=None or \
-       re.compile("I[ACTG]+").match(allele)!=None or \
-       re.compile("D[0-9]+").match(allele)!=None):
+    if not (re.compile("^[ACTG]+$").match(allele)!=None or \
+       re.compile("^I[ACTG]+$").match(allele)!=None or \
+       re.compile("^D[0-9]+$").match(allele)!=None):
         errAbort("invalid allele parameter, can only be a [ACTG]+ or I[ACTG]+ or D[0-9]+")
     if track is not None:
         if not track.isalnum():
