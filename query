@@ -7,8 +7,10 @@ import cgi, subprocess, sys, cgitb, os, socket, time, json, glob, urlparse, time
 import sqlite3, gzip, optparse, gc, string, re, socket
 from os.path import join, isfile, dirname, isdir, basename
 
+cherryPyLoaded = False
 try:
     import cherrypy
+    cherryPyLoaded = True
 except:
     pass # in case user hasn't installed cherrypy
     
@@ -116,9 +118,10 @@ def errAbort(errMsg=None):
     printJson(ret)
     sys.exit(0)
 
-def printHelp():
-    " print help text to stdout and exit "
-    print "<html><body>"
+def makeHelp():
+    " return help text to as a string "
+    lines = []
+    lines.append( "<html><body>" )
     host = hostName # convert from global to local var
     if host.endswith(".ucsc.edu"):
         helpDir = "/gbdb/hg19/beacon"
@@ -130,9 +133,9 @@ def printHelp():
         errAbort("no file %s found. The beacon is not activated on this machine" % helpPath)
 
     helpText = open(helpPath).read()
-    print helpText % locals()
-    print "</body></html>"
-    sys.exit(0)
+    lines.append( helpText % locals() )
+    lines.append( "</body></html>" )
+    return "\n".join(lines)
 
 def dataSetResources():
     " Returns the list of DataSetResources "
@@ -161,8 +164,9 @@ def beaconInfo():
         "size": size
         }
 
-def printJson(data):
-    print json.dumps(data, indent=4, sort_keys=True,separators=(',', ': '))
+def makeJson(data):
+    " convert a dictionary to a JSON-encoded string "
+    return json.dumps(data, indent=4, sort_keys=True,separators=(',', ': '))
 
 def hgBotDelay():
     " implement bottleneck delay, get bottleneck server from hg.conf "
@@ -575,20 +579,33 @@ def importFiles(fileNames, datasetName, format):
     indexTime = time.time()
     printTime(insertTime, indexTime, len(alleles))
 
-class HelloWorld(object):
-    @cherrypy.expose
-    def index(self):
-        return "Hello world!"
+# define the class only if cherryPy is installed, as otherwise the @ line 
+# will trigger an error
+if cherryPyLoaded:
+
+    class DevServer(object):
+        @cherrypy.expose
+        def query(self, chromosome=None, position=None, referenceBases=None, alternateBases=None, reference=None, dataset=None, format=None, allele=None):
+            if allele!=None:
+                alternateBases = allele
+            return beaconQuery(chromosome, position, referenceBases, alternateBases, reference, dataset, format)
+
+def startDevServer(port):
+    " start the development webserver "
+    if not cherryPyLoaded:
+        print("You are trying to start the development webserver but the cherryPy directory cannot be found.")
+        print("You have to re-download or copy the beacon directory again from github or your source to this directory and include the cheeryPy/ subdirectory.")
+        sys.exit(1)
+    cherrypy.config.update({'server.socket_port': port})
+    cherrypy.quickstart(DevServer())
+    sys.exit(0)
 
 def mainCommandLine():
     " main function if called from command line "
     args, options = parseArgs()
 
     if options.port:
-        portNum = options.port
-        import cherrypy
-        cherrypy.config.update({'server.socket_port': portNum})
-        cherrypy.quickstart(HelloWorld())
+        startDevServer(options.port)
 
     datasetName = args[0]
     fileNames = args[1:]
@@ -598,6 +615,16 @@ def mainCommandLine():
 
     importFiles(fileNames, datasetName, options.format)
     
+def beaconQuery(chrom, pos, refBases, altBases, reference, dataset, format):
+    if chrom==None and pos==None and altBases==None:
+        return makeHelp()
+
+    ret = lookupAlleleJson(chrom, pos, altBases, refBases, reference, dataset)
+    if format=="text":
+        return ret["response"]["exists"]
+    else:
+        return makeJson(ret)
+
 def mainCgi():
     print "Content-Type: text/html\n"
 
@@ -610,7 +637,7 @@ def mainCgi():
     # react based on symlink that was used to call this script
     page = parsedUrl[2].split("/")[-1] # last part of path is REST endpoint
     if page=="info":
-        printJson(beaconInfo())
+        rpintJson(beaconInfo())
         sys.exit(0)
 
     hgBotDelay()
@@ -623,15 +650,7 @@ def mainCgi():
     dataset = form.getfirst("dataset")
     format = form.getfirst("format")
 
-    if chrom==None and pos==None and altBases==None:
-        printHelp()
-        sys.exit(0)
-
-    ret = lookupAlleleJson(chrom, pos, altBases, refBases, reference, dataset)
-    if format=="text":
-        print ret["response"]["exists"]
-    else:
-        printJson(ret)
+    print beaconQuery(chrom, pos, refBases, altBases, reference, dataset, format)
 
 if __name__=="__main__":
     # deactivate this on the RR, but useful for debugging: prints a http header
