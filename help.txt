@@ -1,4 +1,10 @@
 <pre>
+! Developer note: 
+! This help html message is contained in the file help.txt 
+! You can adapt it to your institution/dataset
+! If you are looking for a manual user interface for the beacon,
+! have a look at the file index.html
+
 A Genomics Alliance Beacon, see http://ga4gh.org/#/beacon
 
 * REST endpoint cgi-bin/beacon/query:
@@ -17,11 +23,12 @@ A Genomics Alliance Beacon, see http://ga4gh.org/#/beacon
   no parameters
 
 Examples:
-%(host)s/cgi-bin/ucscBeacon/query?dataset=test&chromosome=1&position=10150&allele=A
-%(host)s/cgi-bin/ucscBeacon/query?dataset=test&chromosome=1&position=4772339&allele=T
+query?dataset=test&chromosome=1&position=10150&allele=A
+query?dataset=test&chromosome=1&position=10150&allele=A&format=text
+query?dataset=test&chromosome=1&position=4772339&allele=T
 - returns "true", this allele is in the beacon
 
-%(host)s/cgi-bin/ucscBeacon/query?dataset=test&chromosome=1&position=1234&allele=T
+query?dataset=test&chromosome=1&position=1234&allele=T
 - returns "false", this allele is not in the beacon
 
 </pre>

@@ -2,25 +2,18 @@ Introduction
 ============
 
 The GA4H beacon system http://ga4gh.org/#/beacon is a small webservice
-that accepts a chromosome position and allele and replies with "true" if
-it finds information about the allele, "false" otherwise.  The purpose of the
-system is not maximum data transfer, but limiting information, to prevent the
-identification of patients or at least make it hard to identify them.
+that accepts a chromosome position and allele and replies with "true" or
+"false. This is an implementation of the GA4GH beacon 0.2 draft API which
+tries to be as simple as possible to install and configure, it requires 
+only Python >2.5, the default in current linux distributions and OSX.
 
-This is an implementation of the GA4GH beacon 0.2 draft API with minimum
-dependencies which can be installed by simply copying it into a webserver directory.
-
-This implementation consists of a single python script.
-The whole git repo can be cloned into a apache cgi-bin directory and should run as-is.
-The script has no other dependencies, only needs a Python > 2.5, which
-is the default in all current linux distributions and OSX with the exception of Centos/RHEL 5.
-
-Your raw data, like VCF (see below) are not accessed by the script, but converted
-into the minimal format chrom-position-alternateBases. To keep the security
-implications minimal, the script is small and runs within your existing Apache webserver or 
-any other webserver that supports CGI. The script can slow down queries if too
-many come in from the same IP address, to prevent that someone queries the whole
-genome (see the end of this document).
+For security reasons, the script is small and either
+provides its own webserver or runs within your existing webserver as a CGI.
+This beacon can slow down queries if too many come in from the same IP
+address, to prevent that someone queries the whole genome (see the end of
+this document). For security reasons, your raw data, like VCF (see below) are
+not accessed by the script, but first converted into the minimal format
+chrom-position-alternateBases. 
 
 Quick-start using the built-in webserver
 =======================================
@@ -38,15 +31,24 @@ Then go to your web browser and try a few URLs:
 * http://localhost:8888/query?dataset=test&chromosome=1&position=10150&allele=A
 * http://localhost:8888/query?dataset=test&chromosome=1&position=10150&allele=C
 
+Stop the beacon server by hitting Ctrl+C.
+
 Reset the databse and import your own data in VCF format (see below for other supported formats):
 
-    rm beaconData.sqlite
-    ./query test yourData.vcf.gz
+    rm beaconData.GRCh37.sqlite
+    ./query GRCh37 test yourData.vcf.gz
 
-And query again with URLs, as above.
+Restart the server:
 
-Installation in Apache
-======================
+    ./query -p 8888
+
+And query again with URLs, as above, but adapting the chromosome and position to one that is valid in your dataset.
+
+You can adapt the name of your beacon, your institution etc. by editing the
+file beacon.conf and change the beacon help text by editing the file help.txt
+
+Installation in Apache as a CGI
+===============================
 
 On Ubuntu/Debian:
   
@@ -65,7 +67,7 @@ On Centos/Fedora/Redhat:
 On OSX (thanks to Patrick Leyshock and Andrew Zimmer):
 
     # Uncomment this line in /etc/apache2/httpd.conf
-    # LoadModule cgi_module libexec/apache2/mod_cgi.so
+    # "LoadModule cgi_module libexec/apache2/mod_cgi.so"
     sudo apachctl -k restart
     cd /Library/WebServer/CGI-Executables/
     curl -L -G https://github.com/maximilianh/ucscBeacon/archive/master.zip -o beacon.zip
@@ -112,19 +114,19 @@ Adding your own data
 
 Remove the default test database:
 
-    mv beaconData.sqlite beaconData.sqlite.old
+    mv beaconData.GRCh37.sqlite beaconData.GRCh37.sqlite.old
 
 Import some of the provided test files in complete genomics format:
 
-    ./query testDataCga test/var-GS000015188-ASM.tsv test/var-GS000015188-ASM2.tsv -f cga
+    ./query GRCh37 testDataCga test/var-GS000015188-ASM.tsv test/var-GS000015188-ASM2.tsv -f cga
 
 Or import some of the provided test files in complete genomics format:
 
-    ./query testDataVcf test/icgcTest.vcf test/icgcTest2.vcf
+    ./query GRCh37 testDataVcf test/icgcTest.vcf test/icgcTest2.vcf
 
 Or import your own VCF file as a dataset 'icgc':
 
-    ./query icgc simple_somatic_mutation.aggregated.vcf.gz
+    ./query GRCh37 icgc simple_somatic_mutation.aggregated.vcf.gz
 
 You can specify multiple filenames, so the data will get merged.
 A typical import speed is 100k rows/sec, so it can take a while if you have millions of variants.
@@ -228,16 +230,8 @@ Create a file hg.conf in the same directory as hgBeacon and add these lines:
 For each request, hgBeacon will contact the bottleneck server. It will
 increase a counter by 150msec for each request from an IP. After every second
 without a request from an IP, 10msec will get deducted from the counter. As
-soon as the total counter exceeds 10 seconds for an IP, all beacon replies will
-get delayed by the current counter for this IP. If the counter still exceeds 20
-seconds (which can only happen if the client uses multiple threads), the beacon
-will block this IP address until the counter falls below 20 seconds again.
-
-Troubleshooting
-===============
-
-Make sure that
-your system does not use python 3 by default (run "python --version"). As of 2015
-this is only the case on ArchLinux, Gentoo, NetBsd, FreeBsd and a few other exotic Linux distributions.
-If this is the case, install python2.7 and change the first line of the script, replace python with python2.7
-
+soon as the total counter exceeds 10 seconds for an IP, all beacon replies
+will get delayed by the current counter for this IP. If the counter still
+exceeds 20 seconds (which can only happen if the client uses multiple
+threads), the beacon will block this IP address until the counter falls below
+20 seconds again.

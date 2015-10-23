@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.7
 # A beacon allows very limited queries against a set of variants without allowing someone
 # to download the list of variants
 # see ga4gh.org/#/beacon (UCSC redmine 14393)
@@ -16,20 +16,9 @@ except:
     
 # general info about this beacon
 hostName = os.environ.get("HTTP_HOST", "localhost")
-homepage = "http://%s/cgi-bin/hgBeacon" % hostName
-beaconDesc = {
-    "id":"ucsc-browser", \
-    "name":"Genome Browser", \
-    "organization" : "UCSC", \
-    "description" : "UCSC Genome Browser",
-    "api" : "0.2",
-    "homepage": homepage
-    }
-# the list genome reference we support
-beaconReferences = ["GRCh37"]
 
-# sqlite database 
-SQLITEDB = "beaconData.sqlite"
+# the list genome reference we support
+beaconReferences = ["GRCh37", "GRCh38"]
 
 # dir of the CGIs relative to REQUEST_URI
 #cgiDir = ".." # symlinks are one level below the main cgi-bin dir
@@ -89,7 +78,7 @@ def parseConf(fname):
     return conf
 
 def parseHgConf(confDir="."):
-    """ return hg.conf as dict key:value """
+    """ return beacon.conf or alternatively hg.conf as dict key:value """
     global hgConf
     if hgConf is not None:
         return hgConf
@@ -97,7 +86,9 @@ def parseHgConf(confDir="."):
     hgConf = dict() # python dict = hash table
 
     currDir = dirname(__file__)
-    fname = join(currDir, confDir, "hg.conf")
+    fname = join(currDir, confDir, "beacon.conf")
+    if not isfile(fname):
+        fname = join(currDir, confDir, "hg.conf")
     if not isfile(fname):
         fname = join(currDir, "hg.conf")
     if not isfile(fname):
@@ -106,17 +97,16 @@ def parseHgConf(confDir="."):
 
     return hgConf
 
-def errAbort(errMsg=None):
-    " exit with error message "
+def jsonErrMsg(errMsg=None):
+    " wrap error message into a JSON dict "
     if errMsg == None:
         sys.exit(0)
 
-    helpUrl = "http://%s/cgi-bin/hgBeacon?page=help" % hostName
+    helpUrl = getBeaconDesc()["homepage"]
 
     ret = {"errormsg":errMsg, 
         "more_info":"for a complete description of the parameters, read the help message at %s" % helpUrl}
-    printJson(ret)
-    sys.exit(0)
+    return json.dumps(ret, indent=4, sort_keys=True,separators=(',', ': '))
 
 def makeHelp():
     " return help text to as a string "
@@ -130,7 +120,7 @@ def makeHelp():
 
     helpPath = join(helpDir, "help.txt")
     if not isfile(helpPath):
-        errAbort("no file %s found. The beacon is not activated on this machine" % helpPath)
+        return jsonErrMsg("no file %s found. The beacon is not activated on this machine" % helpPath)
 
     helpText = open(helpPath).read()
     lines.append( helpText % locals() )
@@ -141,24 +131,45 @@ def dataSetResources():
     " Returns the list of DataSetResources "
     totalSize = 0
     dsrList = []
-    conn = dbOpen(mustExist=True)
-    for tableName in dbListTables(conn):
-        rows = dbQuery(conn, "SELECT COUNT(*) from %s" % tableName, None)
-        itemCount = rows[0][0]
-        
-        # the dataset ID is just the file basename without extension
-        dsId = tableName
-        dsr = (dsId, DataSetDescs.get(dsId, ""), itemCount)
-        dsrList.append(dsr)
-        totalSize += itemCount
+    for refDb in beaconReferences:
+        conn = dbOpen(refDb, mustExist=True)
+        if conn==None:
+            continue
+        for tableName in dbListTables(conn):
+            rows = dbQuery(conn, "SELECT COUNT(*) from %s" % tableName, None)
+            itemCount = rows[0][0]
+            
+            # the dataset ID is just the file basename without extension
+            dsId = tableName
+            dsr = (dsId, DataSetDescs.get(dsId, ""), itemCount)
+            dsrList.append(dsr)
+            totalSize += itemCount
+
     return totalSize, dsrList
+
+def getBeaconDesc():
+    " return beaconDesc dict, built from beacon.conf "
+    parseHgConf()
+    homepage = "http://%s/cgi-bin/hgBeacon" % hostName
+    beaconDesc = {
+        "id":hgConf.get("beacon-id", "ucsc-browser"), \
+        "name":hgConf.get("beacon-name", "Genome Browser"), \
+        "organization" : hgConf.get("beacon-org", "UCSC"), \
+        "description" : hgConf.get("beacon-desc", "UCSC Genome Browser"),
+        "api" : "0.2",
+        "homepage": hgConf.get("beacon-url", homepage),
+        }
+    return beaconDesc
 
 def beaconInfo():
     " return a beaconInfo dict "
     size, dsrList = dataSetResources()
+    if size==0:
+        return jsonErrMsg("This beacon is not serving any data. There are either no *.sqlite files in the beacon directory or they contain no data.")
+
     return \
         {
-        "beacon": beaconDesc,
+        "beacon": getBeaconDesc(),
         "references": beaconReferences,
         "datasets": dsrList,
         "size": size
@@ -171,7 +182,7 @@ def makeJson(data):
 def hgBotDelay():
     " implement bottleneck delay, get bottleneck server from hg.conf "
     global hgConf
-    hgConf = parseHgConf("..")
+    hgConf = parseHgConf()
     if "bottleneck.host" not in hgConf:
         return
     ip = os.environ["REMOTE_ADDR"]
@@ -182,47 +193,58 @@ def hgBotDelay():
         print("Blocked")
         sys.exit(0)
 
+class BeaconError(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+
 def checkParams(chrom, pos, allele, reference, track):
     " make sure the parameters follow the spec "
+    # default is GRCh37 is not assembly has been provided
     if reference==None or reference=="":
         reference="GRCh37"
+    # make sure that the assembly is a valid one
     if reference not in beaconReferences:
-        errAbort("invalid 'reference' parameter, valid ones are %s" % ",".join(beaconReferences))
+        raise BeaconError("invalid 'reference' parameter, valid ones are %s" % ",".join(beaconReferences))
+    # chrom is required
     if chrom==None or chrom=="":
-        errAbort("missing chromosome parameter")
+        raise BeaconError("missing chromosome parameter")
+    # allele is required
     if allele==None or allele=="":
-        errAbort("missing allele parameter")
+        raise BeaconError("missing allele parameter")
 
     allele = allele.upper()
+    # allele can only be a DNA sequence (~SNP) or an indel
     if not (re.compile("^[ACTG]+$").match(allele)!=None or \
        re.compile("^I[ACTG]+$").match(allele)!=None or \
        re.compile("^D[0-9]+$").match(allele)!=None):
-        errAbort("invalid allele parameter, can only be a [ACTG]+ or I[ACTG]+ or D[0-9]+")
+        raise("invalid allele parameter, can only be a [ACTG]+ or I[ACTG]+ or D[0-9]+")
     if track is not None:
         if not track.isalnum():
-            errAbort("'dataset' parameter must contain only alphanumeric characters")
+            raise BeaconError("'dataset' parameter must contain only alphanumeric characters")
         if len(track)>100:
-            errAbort("'dataset' parameter must not be longer than 100 chars")
+            raise BeaconError("'dataset' parameter must not be longer than 100 chars")
 
     if pos==None or not pos.isdigit():
-        errAbort("'position' parameter is not a number")
+        raise BeaconError("'position' parameter is not a number")
     pos = int(pos)
 
-    # convert chrom to hg19 format
+    # convert chrom to UCSC 'chr'+Num format
+    # we currently don't accept the new hg38 sequences
+    # -> is this a problem?
     if chrom==None:
-        errAbort( "missing chromosome parameter")
+        raise BeaconError( "missing chromosome parameter")
     if not ((chrom.isdigit() and int(chrom)>=1 and int(chrom)<=22) or chrom in ["X","Y","M","test"]):
-        errAbort( "invalid chromosome name %s" % chrom)
+        raise BeaconError( "invalid chromosome name %s" % chrom)
 
     return chrom, pos, allele, reference, track
 
 def lookupAllele(chrom, pos, allele, reference, dataset):
     " check if an allele is present in a sqlite DB "
-    conn = dbOpen(mustExist=True)
+    conn = dbOpen(reference, mustExist=True)
     tableList = dbListTables(conn)
     if dataset!=None:
         if dataset not in tableList:
-            errAbort("dataset %s is not present on this server" % dataset)
+            raise BeaconError("dataset %s is not present on this server" % dataset)
         tableList = [dataset]
 
     for tableName in tableList:
@@ -243,7 +265,6 @@ def lookupAllele(chrom, pos, allele, reference, dataset):
 def lookupAlleleJson(chrom, pos, altBases, refBases, reference, dataset):
     " call lookupAllele and wrap the result into dictionaries "
     chrom, pos, altBases, reference, dataset = checkParams(chrom, pos, altBases, reference, dataset)
-
     exists = lookupAllele(chrom, pos, altBases, reference, dataset)
 
     if chrom=="test" and pos==0:
@@ -257,7 +278,9 @@ def lookupAlleleJson(chrom, pos, altBases, refBases, reference, dataset):
         "reference": reference,
         "dataset": dataset
         }
-    ret = {"beacon" : beaconDesc, "query" : query, "response" : {"exists":exists} }
+
+    ret = {"beacon" : getBeaconDesc(), "query" : query, \
+        "response" : {"exists":exists} }
     return ret
     
 def main():
@@ -274,7 +297,7 @@ def main():
 
 def parseArgs():
     " parse command line options into args and options "
-    parser = optparse.OptionParser("""usage: %prog [options] [datasetName] filename(s) - import VCF or BED files into the beacon database. 
+    parser = optparse.OptionParser("""usage: %prog [options] [referenceDb] [datasetName] filename(s) - import VCF, complete genomics or BED files into the beacon database.
     - parameter 'datasetName' is optional and defaults to 'defaultDataset'.
     - any existing dataset of the same name will be overwritten
     - the data is written to beaconData.sqlite. You can use 'sqlite3' to inspect the data file.
@@ -284,9 +307,11 @@ def parseArgs():
     parser.add_option("-d", "--debug", dest="debug", \
         action="store_true", help="show debug messages")
     parser.add_option("-p", "--port", dest="port", \
-        action="store", type="int", help="start development server and listen on given port for queries")
+        action="store", type="int", help="start development \
+            server and listen on given port for queries")
     parser.add_option("-f", "--format", dest="format", \
-        action="store", help="format of input file, one of vcf, lovd, hgmd. default %default", \
+        action="store", help="format of input file, one of vcf, lovd, \
+            hgmd, cga (=complete genomics). default %default", \
         default = "vcf") 
     (options, args) = parser.parse_args()
 
@@ -311,20 +336,22 @@ def dbMakeTable(conn, tableName):
     conn.commit()
     #'  PRIMARY KEY (chrom, pos, allele) '
 
-def dbFileName():
+def dbFileName(refDb):
     " return name of database file "
     dbDir = dirname(__file__) # directory where script is located
     if hostName.endswith("ucsc.edu"): # data is not in CGI directory at UCSC
         dbDir = "/gbdb/hg19/beacon/"
-    dbName = join(dbDir, SQLITEDB)
-    return dbName
+    # sqlite database 
+    dbName = "beaconData.%s.sqlite" % refDb
+    dbPath = join(dbDir, dbName)
+    return dbPath
 
-def dbOpen(mustExist=False):
+def dbOpen(refDb, mustExist=False):
     " open the sqlite db and return a DB connection object "
-    dbName = dbFileName()
+    dbName = dbFileName(refDb)
 
     if not isfile(dbName) and mustExist:
-        errAbort("Database file %s does not exist. This beacon is not serving any data." % dbName)
+        return None
     conn = sqlite3.Connection(dbName)
     return conn
 
@@ -517,9 +544,9 @@ def printTime(time1, time2, rowCount):
     timeDiff = time2 - time1
     print "Time: %f secs for %d rows, %d rows/sec" % (timeDiff, rowCount, rowCount/timeDiff)
 
-def importFiles(fileNames, datasetName, format):
+def importFiles(refDb, fileNames, datasetName, format):
     """ open the sqlite db, create a table datasetName and write the data in fileName into it """
-    conn = dbOpen()
+    conn = dbOpen(refDb)
     dbMakeTable(conn, datasetName)
 
     # try to make sqlite writes as fast as possible
@@ -564,7 +591,7 @@ def importFiles(fileNames, datasetName, format):
 
     printTime(startTime, loadTime, len(alleles))
 
-    print "Loading alleles into database %s" % dbFileName()
+    print "Loading alleles into database %s" % dbFileName(refDb)
     for rows in iterChunks(alleles, 50000):
         sql = "INSERT INTO %s (chrom, pos, allele) VALUES (?,?,?)" % datasetName
         conn.executemany(sql, rows)
@@ -579,7 +606,7 @@ def importFiles(fileNames, datasetName, format):
     indexTime = time.time()
     printTime(insertTime, indexTime, len(alleles))
 
-# define the class only if cherryPy is installed, as otherwise the @ line 
+# define this class only if cherryPy is installed, as otherwise the @ line
 # will trigger an error
 if cherryPyLoaded:
 
@@ -590,6 +617,7 @@ if cherryPyLoaded:
                 alternateBases = allele
             return beaconQuery(chromosome, position, referenceBases, alternateBases, reference, dataset, format)
 
+        @cherrypy.expose
         def info(self):
             return makeJson(beaconInfo())
 
@@ -597,7 +625,7 @@ def startDevServer(port):
     " start the development webserver "
     if not cherryPyLoaded:
         print("You are trying to start the development webserver but the cherryPy directory cannot be found.")
-        print("You have to re-download or copy the beacon directory again from github or your source to this directory and include the cheeryPy/ subdirectory.")
+        print("You have to re-download or copy the beacon directory again from github or your source to this directory and include the cherryPy/ subdirectory.")
         sys.exit(1)
     cherrypy.config.update({'server.socket_port': port})
     cherrypy.quickstart(DevServer())
@@ -610,23 +638,36 @@ def mainCommandLine():
     if options.port:
         startDevServer(options.port)
 
-    datasetName = args[0]
-    fileNames = args[1:]
-    if len(args)<2:
-        print("You need to specify at least a datasetName and one fileName")
+    refDb = args[0]
+    datasetName = args[1]
+    fileNames = args[2:]
+    if len(args)<3:
+        print("You need to specify at least an assembly, a datasetName and one fileName to import")
         sys.exit(1)
 
-    importFiles(fileNames, datasetName, options.format)
+    if refDb not in beaconReferences:
+        print ("The reference assembly '%s' is not valid." % beaconReferences)
+        print ("Please specify one of these reference assemblies:")
+        print (",".join(beaconReferences))
+        sys.exit(1)
+
+    importFiles(refDb, fileNames, datasetName, options.format)
     
 def beaconQuery(chrom, pos, refBases, altBases, reference, dataset, format):
+    """ query the beacon, returns a JSON or text string """
     if chrom==None and pos==None and altBases==None:
         return makeHelp()
 
-    ret = lookupAlleleJson(chrom, pos, altBases, refBases, reference, dataset)
-    if format=="text":
-        return ret["response"]["exists"]
-    else:
-        return makeJson(ret)
+    try:
+
+        ret = lookupAlleleJson(chrom, pos, altBases, refBases, reference, dataset)
+        if format=="text":
+            return ret["response"]["exists"]
+        else:
+            return makeJson(ret)
+
+    except BeaconError, ex:
+        return jsonErrMsg(ex.msg)
 
 def mainCgi():
     print "Content-Type: text/html\n"
