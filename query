@@ -13,16 +13,9 @@ try:
     cherryPyLoaded = True
 except:
     pass # in case user hasn't installed cherrypy
-    
-# general info about this beacon
+
+# current host name, if running as a CGI
 hostName = os.environ.get("HTTP_HOST", "localhost")
-
-# the list genome reference we support
-beaconReferences = ["GRCh37", "GRCh38"]
-
-# dir of the CGIs relative to REQUEST_URI
-#cgiDir = ".." # symlinks are one level below the main cgi-bin dir
-cgiDir = "." # symlinks are in the current dir, for GA4GH
 
 # cache of hg.conf dict
 hgConf = None
@@ -131,7 +124,7 @@ def dataSetResources():
     " Returns the list of DataSetResources "
     totalSize = 0
     dsrList = []
-    for refDb in beaconReferences:
+    for refDb in getBeaconRefs():
         conn = dbOpen(refDb, mustExist=True)
         if conn==None:
             continue
@@ -150,6 +143,8 @@ def dataSetResources():
 def getBeaconDesc():
     " return beaconDesc dict, built from beacon.conf "
     parseHgConf()
+    # default values are set so the beacon works as part of 
+    # a UCSC mirror installation without any config file
     homepage = "http://%s/cgi-bin/hgBeacon" % hostName
     beaconDesc = {
         "id":hgConf.get("beacon-id", "ucsc-browser"), \
@@ -161,6 +156,11 @@ def getBeaconDesc():
         }
     return beaconDesc
 
+def getBeaconRefs():
+    """ return the list of valid reference assemblies from beacon.conf """
+    parseHgConf()
+    return hgConf.get("beacon-refs", "GRCh37").split(",")
+
 def beaconInfo():
     " return a beaconInfo dict "
     size, dsrList = dataSetResources()
@@ -170,7 +170,7 @@ def beaconInfo():
     return \
         {
         "beacon": getBeaconDesc(),
-        "references": beaconReferences,
+        "references": getBeaconRefs(),
         "datasets": dsrList,
         "size": size
         }
@@ -201,10 +201,10 @@ def checkParams(chrom, pos, allele, reference, track):
     " make sure the parameters follow the spec "
     # default is GRCh37 is not assembly has been provided
     if reference==None or reference=="":
-        reference="GRCh37"
+        reference=getBeaconRefs()[0]
     # make sure that the assembly is a valid one
-    if reference not in beaconReferences:
-        raise BeaconError("invalid 'reference' parameter, valid ones are %s" % ",".join(beaconReferences))
+    if reference not in getBeaconRefs():
+        raise BeaconError("invalid 'reference' parameter, valid ones are %s" % ",".join(getBeaconRefs()))
     # chrom is required
     if chrom==None or chrom=="":
         raise BeaconError("missing chromosome parameter")
@@ -645,10 +645,10 @@ def mainCommandLine():
         print("You need to specify at least an assembly, a datasetName and one fileName to import")
         sys.exit(1)
 
-    if refDb not in beaconReferences:
-        print ("The reference assembly '%s' is not valid." % beaconReferences)
+    if refDb not in getBeaconRefs():
+        print ("The reference assembly '%s' is not valid." % refDb)
         print ("Please specify one of these reference assemblies:")
-        print (",".join(beaconReferences))
+        print (",".join(getBeaconRefs()))
         sys.exit(1)
 
     importFiles(refDb, fileNames, datasetName, options.format)
